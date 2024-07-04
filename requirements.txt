@@ -1,0 +1,9 @@
+Babel==2.15.0
+numpy==2.0.0
+pandas==2.2.2
+plotly==5.22.0
+Requests==2.32.3
+SQLAlchemy==2.0.30
+streamlit==1.36.0
+streamlit_antd_components==0.3.2
+streamlit_extras==0.4.3
