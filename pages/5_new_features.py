@@ -1,23 +1,41 @@
 import streamlit as st
-import pandas as pd
-from core_components.functions import populate_list
 from Dashboard import db_operations
+from core_components.functions import populate_list
+from collections import defaultdict
+import pandas as pd
+import numpy as np
 
+# Due to unknown limitation, setting values to st.session_state with function defined in another script doesn't always execute.
+for table in ["detailed_transactions"]:
+    if f"{table}_df" not in st.session_state:
+        st.session_state[f"{table}_df"] = db_operations.table_query(
+            f"Select * from {table}"
+        )
+
+st.title("Testing")
+
+# Display the transactions dataframe. (to be replaced with Card UI)
+st.dataframe(st.session_state["detailed_transactions_df"], hide_index=True)
 
 @st.experimental_dialog("Add new Transaction", width="large")
-def new_transaction_dialog():
+def edit_row(row=None):
     """
     Create dialog box UI to create new transaction.
     """
+
+    if isinstance(row, tuple):
+        None
+    else:    
+        row = defaultdict(lambda: None)
+    
     with st.container():
         block1 = st.columns([3, 3, 2])
+        merchant_options = populate_list(st.session_state["detailed_transactions_df"]["transaction_merchant_name"])
         merchant = block1[0].selectbox(
             "Merchant/Location",
-            options=populate_list(
-                st.session_state["detailed_transactions_df"][
-                    "transaction_merchant_name"
-                ]
-            )
+            options=merchant_options,
+            placeholder=(row.transaction_merchant_name or None),
+            index=None
         )
         # New values cannot be typed in selectbox, thus creating new field.
         if merchant == "<New value>":
@@ -31,7 +49,7 @@ def new_transaction_dialog():
         account_details = st.session_state["detailed_accounts_df"][
             st.session_state["detailed_accounts_df"]["account_name"] == account_name
         ].reset_index(drop=True)
-        transaction_date = block1[2].date_input(label="Transaction Date", value="today")
+        transaction_date = block1[2].date_input(label="Transaction Date", value=(row.transaction_date or "today"))
 
         block2 = st.columns(2)
         category = block2[0].selectbox(
@@ -113,19 +131,43 @@ def new_transaction_dialog():
             del st.session_state["detailed_transactions_df"]
             st.rerun()
 
+if st.button("haha"):
+    edit_row()
+st.session_state["detailed_transactions_df"]["transaction_date"] = pd.to_datetime(st.session_state["detailed_transactions_df"]["transaction_date"])
 
-# Due to unknown limitation, setting values to st.session_state with function defined in another script doesn't always execute.
-for table in ["detailed_transactions"]:
-    if f"{table}_df" not in st.session_state:
-        st.session_state[f"{table}_df"] = db_operations.table_query(
-            f"Select * from {table}"
-        )
+block = st.columns(2)
+left_con = block[0].container()
+right_con = block[1].container()
 
-st.title("Transactions")
+for row in st.session_state["detailed_transactions_df"].reset_index(drop=True).itertuples():
 
-block1 = st.columns([7, 2])
-if block1[1].button("Add new Transaction", use_container_width=True):
-    new_transaction_dialog()
+    con = None    
+    if getattr(row, 'Index') % 2 == 0:
+        con = left_con.container(border=True)
+    else:
+        con = right_con.container(border=True)
+        
+    row0 = con.columns([10,1],vertical_alignment="center")
+    row0[1].button("✎", key=f"del_{row.transaction_merchant_name}_{row.transaction_id}", on_click=edit_row, args=[row],use_container_width=True)
+    row0[0].write(f"{row.transaction_merchant_name}_{row.transaction_id}")
+    id = con.text_input(label="transaction_merchant_name", value = row.transaction_merchant_name,
+                        key=f"{row.transaction_merchant_name}_{row.transaction_id}", disabled=True)
+    
 
-# Display the transactions dataframe. (to be replaced with Card UI)
-st.dataframe(st.session_state["detailed_transactions_df"], hide_index=True)
+
+
+"""
+To-do
+
+1. Build alter table database function.
+2. Update dialog functions to set default values, change button to Update transaction to call alter table.
+3. Mark transactions as complete.
+4. Delete a transaction.
+4. Build filters, etc to UI to search and filter through transactions, transfers, accounts, etc.
+5. Pagination.
+6. Tabs for Multiple Card UI's in a single page.
+7. Card UI elements with important fields. (Without a lot of hardcoding)
+
+
+
+"""
