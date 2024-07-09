@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from Dashboard import db_operations, get_database_tables
+from Dashboard import db_operations
 
 
 # Function to create the dialog box for new category

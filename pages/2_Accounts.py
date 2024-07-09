@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
-from Dashboard import db_operations, curr, get_database_tables
-
+from Dashboard import db_operations, curr
 
 @st.experimental_dialog("Add new Account")
 def new_account_dialog():
