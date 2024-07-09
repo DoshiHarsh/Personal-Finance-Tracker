@@ -29,7 +29,6 @@ def new_account_dialog():
                     df=pd.DataFrame({"account_type_name": [new_account_type]}),
                 )
                 del st.session_state["account_types_df"]
-                get_database_tables(["account_types"])
                 st.rerun()
 
         block2 = st.columns([4, 5])
