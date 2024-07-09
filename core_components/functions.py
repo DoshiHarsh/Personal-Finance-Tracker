@@ -176,7 +176,7 @@ class Currencies:
             current_timestamp = 0
 
         new_rates_df = self.get_new_currency_rates()
-        if new_rates_df["currency_update_timestamp"][0] > current_timestamp:
+        if new_rates_df["currency_update_timestamp"][0] > (current_timestamp or 0):
             res1 = self.update_currency_desc(new_rates_df["currency_abbr"])
             res2 = self.update_currency_rates(new_rates_df)
             return True if all((res1, res2)) else False
