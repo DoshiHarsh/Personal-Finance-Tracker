@@ -168,7 +168,7 @@ class Currencies:
         """
         try:
             current_timestamp_query = "Select max(currency_update_timestamp) as current_timestamp from currency_rates"
-            current_timestamp = self.db_operations.query_table(current_timestamp_query)[
+            current_timestamp = self.db_operations.table_query(current_timestamp_query)[
                 "current_timestamp"
             ][0]
         except Exception as e:
