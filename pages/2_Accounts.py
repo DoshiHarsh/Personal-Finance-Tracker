@@ -4,8 +4,10 @@ from Dashboard import db_operations, curr, get_database_tables
 
 
 @st.experimental_dialog("Add new Account")
-@st.experimental_fragment()
 def new_account_dialog():
+    """
+    Create dialog box UI to create new account.
+    """
     with st.container():
         account_name = st.text_input(placeholder="ex. BoFA", label="Account Name")
 
@@ -75,10 +77,10 @@ def new_account_dialog():
                 }
             )
             db_operations.table_insert(table_name="accounts", df=new_account)
+
             linked_account_id = db_operations.table_query(
                 f"Select account_id from accounts where account_name='{account_name}'"
             )["account_id"][0]
-
             if account_rewards:
                 new_rewards_account = pd.DataFrame(
                     {
@@ -92,44 +94,38 @@ def new_account_dialog():
                     table_name="rewards_accounts", df=new_rewards_account
                 )
             del (
-                st.session_state["accounts_df"],
-                st.session_state["rewards_accounts_df"],
                 st.session_state["detailed_accounts_df"],
-                st.session_state["detailed_rewards_accounts_df"],
-            )
-            get_database_tables(
-                [
-                    "accounts",
-                    "rewards_accounts",
-                    "detailed_accounts",
-                    "detailed_rewards_accounts",
-                ]
+                st.session_state["detailed_reward_accounts_df"],
             )
             st.rerun()
 
 
 @st.experimental_dialog("Record a Transfer", width="large")
-@st.experimental_fragment()
 def new_transfer_dialog():
+    """
+    Create dialog box UI to create new transfer.
+    """
     with st.container():
         origin_account = st.selectbox(
-            options=st.session_state["accounts_df"]["account_name"],
+            options=st.session_state["detailed_accounts_df"]["account_name"],
             label="Origin Account",
             index=None,
         )
-        origin_account_details = st.session_state["accounts_df"][
-            st.session_state["accounts_df"]["account_name"] == origin_account
+        origin_account_details = st.session_state["detailed_accounts_df"][
+            st.session_state["detailed_accounts_df"]["account_name"] == origin_account
         ].reset_index(drop=True)
 
         destination_account = st.selectbox(
-            options=st.session_state["accounts_df"][
-                st.session_state["accounts_df"]["account_name"] != origin_account
+            options=st.session_state["detailed_accounts_df"][
+                st.session_state["detailed_accounts_df"]["account_name"]
+                != origin_account
             ]["account_name"],
             label="Destination Account",
             index=None,
         )
-        destination_account_details = st.session_state["accounts_df"][
-            st.session_state["accounts_df"]["account_name"] == destination_account
+        destination_account_details = st.session_state["detailed_accounts_df"][
+            st.session_state["detailed_accounts_df"]["account_name"]
+            == destination_account
         ].reset_index(drop=True)
 
         transfer_date = st.date_input(label="Transfer Date", value="today")
@@ -167,7 +163,9 @@ def new_transfer_dialog():
                     st.session_state["currency_rates_df"],
                 )
                 conversion_rate = block2[2].number_input(
-                    label="Conversion Rate", value=conversion_rate_value, format="%.6f"
+                    label="Conversion Rate",
+                    value=(conversion_rate_value or 0.00),
+                    format="%.6f",
                 )
             else:
                 origin_currency = destination_currency = origin_account_details[
@@ -245,21 +243,18 @@ def new_transfer_dialog():
                 table_name="cashflow_transactions", df=new_transaction
             )
             del (
-                st.session_state["cashflow_transfers_df"],
-                st.session_state["cashflow_transactions_df"],
                 st.session_state["detailed_transactions_df"],
                 st.session_state["detailed_transfers_df"],
             )
-            get_database_tables(
-                [
-                    "cashflow_transfers",
-                    "cashflow_transactions",
-                    "detailed_transfers",
-                    "detailed_transactions",
-                ]
-            )
             st.rerun()
 
+
+# Due to unknown limitation, setting values to st.session_state with function defined in another script doesn't always execute.
+for table in ["detailed_accounts", "detailed_transfers"]:
+    if f"{table}_df" not in st.session_state:
+        st.session_state[f"{table}_df"] = db_operations.table_query(
+            f"Select * from {table}"
+        )
 
 st.title("Accounts")
 
@@ -269,6 +264,6 @@ if block1[1].button("Add new Account", use_container_width=True):
 if block1[2].button("Record a transfer", use_container_width=True):
     new_transfer_dialog()
 
+# Display the accounts and transfers dataframe. (to be replaced with Card UI)
 st.dataframe(st.session_state["detailed_accounts_df"], hide_index=True)
-st.dataframe(st.session_state["detailed_transactions_df"], hide_index=True)
 st.dataframe(st.session_state["detailed_transfers_df"], hide_index=True)

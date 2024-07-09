@@ -1,31 +1,40 @@
-# Budget
+# Personal Finance Tracker
 
-## Introduction to the Budget Dashboard
+## Introduction to the Personal Finance Tracker
 
-The budget dashboard is meant to be a privacy focused app to track your financial health to build towards your financial goals. 
-It is meant to be a self hosted (either locally or on a cloud hosting service of your preference) service so that you can control who has access to your private financial data. Built using Streamlit, you can easily customize it to your needs. Currently is built on a sqlite3 database but there is planned work to enable you do any database you'd like (via SQLAlchemy).
-If you'd like to contribute, please feel free to fork the repo or submit merge requests, ideas or issues.
+The Personal Finance Tracker is meant to be a privacy focused tool to help track your financial health to build towards your goals. 
+You can host it either locally or on a cloud hosting service of your preference, giving you control on who has access to your private financial data. Built using Streamlit, you can easily customize it to your needs. The backend is currently built on a sqlite3 database but there is planned work to enable you do any database you'd like (via SQLAlchemy).
 
+If you'd like to contribute, please feel free to fork the repo, submit pull requests, ideas, or issues.
 
 ## Prerequisites to run
 
-- Local python installation
-- pip install -r requirements.txt
-- Streamlit run Dashboard.py
+To add dummy data while initialization for the first run, please replace the values in [db_config.json](/files/db_config.json) with the values in [dev_db_config.json](/files/dev_db_config.json) before running the streamlit run command.
 
+- local Python (>3.11) installation. Using python version management like pyenv, or virtualenv is recommended. 
+- pip install -r requirements.txt
+- streamlit run Dashboard.py
+ 
 
 ## Current features
 
 - Create transaction categories and accounts in multiple currencies.
-- Track points and rewards on your cards.
+- Track reward points, miles and dollars (or local equivalent) on your credit cards.
 - And add transactions to add your expenses and income.
 - Transfer money between accounts with currency rate conversion and origin/destination transfer fees.
-- Visualize spending and current account balances. 
+- Visualize spending, current account balances and spend by category over time.
 
 
-## To-do
+## Walkthrough (To-do)
 
-For a detailed overview of planned work and priorities visit the [Project Board](https://github.com/users/DoshiHarsh/projects/2/views/2)
+- Create accounts.
+- Create transactions and transfers.
+- See graphs to track them on the dashboard page.
+
+
+## Planned Work
+
+For a up to date overview of completed, planned work and priorities visit the [Project Board](https://github.com/users/DoshiHarsh/projects/2/views/2).
 
 - User Authentication
     - Email login
@@ -38,7 +47,7 @@ For a detailed overview of planned work and priorities visit the [Project Board]
 
 - Account reconciliation
     - See last reconciled amounts and dates.
-    - View and edit transactions since last reconciliation.
+    - View and edit transactions since last reconciliation
     - Override and update original starting balance by adding current accurate value.
 
 - Investment tracking
@@ -61,11 +70,13 @@ For a detailed overview of planned work and priorities visit the [Project Board]
 
 - Database enhancements
     - Update SQL config for modularity (SQLAlchemy based)
+    - Support for additional databases for flexibility (Postgres, duckDB?)
     - Streamline SQL transformations for data entry and visualization
     - Download the .db/.csv file
 
 - UI and UX enhancements
     - Transaction filters order based on use frequency
+    - Add general help tooltips throughout the UI
     - Add logos to all categories
     - Add logo set for customization by users
     - Model previous monthly spend paths as display them as an underlay
@@ -73,7 +84,7 @@ For a detailed overview of planned work and priorities visit the [Project Board]
     - Improve Error Handling and Logging
     - Streamlit cloud deployment via GitHub
     - Google Drive/OneDrive backup support
-
+   
 - Visualization enhancements
     - Dashboard items clickable onto relevant page (query support)
     - Sankey Diagram for income and spending
@@ -102,7 +113,7 @@ For a detailed overview of planned work and priorities visit the [Project Board]
     - Ability to use reward points as payment method for transactions
     - Ability to transfer rewards points to bank/ credit card accounts
 
-- Ambitious
+- Automation Goals (Long-Term)
     - OCR/AI model to read and add transactions from statements
     - LLM spending review and suggestions towards managing finances better
     - Connect with services like plaid to auto-import data
@@ -110,38 +121,38 @@ For a detailed overview of planned work and priorities visit the [Project Board]
 
 ## Attributions
 
-Currency rates implemented using Free API from [Exchange Rate API[(https://www.exchangerate-api.com)
+Currency rates implemented using Free API from [Exchange Rate API](https://www.exchangerate-api.com).
 
 
 ## License
 
-
+[AGPL-V3.0 License](/LICENSE)
 
 
 ## Resources and Links
 
-Currency:-
+- Currency:-
     - More robust currency support https://babel.pocoo.org/en/latest/api/numbers.html
     - Reorder currency based on most used
 
-Database:-
+- Database:-
     - SQLAlchemy ORM https://auth0.com/blog/sqlalchemy-orm-tutorial-for-python-developers/
     - Passwords https://devguide.dev/blog/store-encrypted-passwords-sqlite-python-sqlalchemy-bcrypt
     - JSON based full audit log https://til.simonwillison.net/sqlite/json-audit-log
 
 - Streamlit
-    Hover on tabs https://github.com/Socvest/streamlit-on-Hover-tabs
-    Lottie animations https://extras.streamlit.app/
-    User logins https://github.com/GauriSP10/streamlit_login_auth_ui
-    Customizable widget like layout for dashboard https://github.com/okld/streamlit-elements
-    Option Menu https://github.com/victoryhb/streamlit-option-menu
-    Extras https://arnaudmiribel.github.io/streamlit-extras/extras/annotated_text/
-    https://github.com/nicedouble/StreamlitAntdComponents
-    https://github.com/gagan3012/streamlit-tags
-    https://st-experimental-fragment.streamlit.app/Two_charts
-    https://plotly.com/python/sankey-diagram/
-    -https://stackoverflow.com/questions/55301343/how-to-define-the-structure-of-a-sankey-diagram-using-a-pandas-dataframe
-
-
-
+    - Hover on tabs https://github.com/Socvest/streamlit-on-Hover-tabs
+    - Lottie animations https://extras.streamlit.app/
+    - User logins https://github.com/GauriSP10/streamlit_login_auth_ui
+    - https://pypi.org/project/streamlit-authenticator/
+    - Customizable widget like layout for dashboard https://github.com/okld/streamlit-elements
+    - Option Menu https://github.com/victoryhb/streamlit-option-menu
+    - Extras https://arnaudmiribel.github.io/streamlit-extras/extras/annotated_text/
+    - https://github.com/nicedouble/StreamlitAntdComponents
+    - https://github.com/gagan3012/streamlit-tags
+    - https://github.com/lukasmasuch/streamlit-pydantic?tab=readme-ov-file#examples
+    - https://st-experimental-fragment.streamlit.app/Two_charts
+    - https://plotly.com/python/sankey-diagram/
+    - https://stackoverflow.com/questions/55301343/how-to-define-the-structure-of-a-sankey-diagram-using-a-pandas-dataframe
+    - https://medium.com/streamlit/paginating-dataframes-with-streamlit-2da29b080920
 

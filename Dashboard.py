@@ -5,6 +5,7 @@ import pandas as pd
 from babel.numbers import format_currency
 import plotly.express as px
 from datetime import datetime, timedelta
+from typing import Optional, List, Unpack, TypedDict, Tuple
 
 db_operations = ConnectDB("budget_db")
 curr = Currencies(db_operations)
@@ -18,43 +19,38 @@ st.set_page_config(
 )
 
 
-def check_database_setup():
-    tables_check = [
-        "event_logs",
-        "categories",
-        "currencies",
-        "currency_rates",
-        "accounts",
-        "account_types",
-        "cashflow_transactions",
-        "cashflow_transfers",
-        "rewards_accounts",
-        "rewards_categories",
-    ]
-    views_check = [
-        "detailed_accounts",
-        "detailed_transactions",
-        "detailed_transfers",
-        "detailed_reward_accounts",
-    ]
-    for table in tables_check:
-        db_operations.table_create_if_missing(table)
-    for view in views_check:
-        db_operations.create_table_view(view)
-    curr.check_and_update_currency_rates()
-    st.session_state["initial_db_check"] = "Complete"
+class filterArgs(TypedDict, total=False):
+    account_types_filter: List
+    accounts_filter: List
+    date_filter: Tuple[datetime, datetime]
+    categories_types_filter: List
+    transaction_status_filter: str
+    transfers_filter: bool
+    inflow_filter: bool
+    cumulative_calculation: bool
 
 
-@st.cache_data(show_spinner=True)
-def get_database_tables(table_list):
-    for table in table_list:
-        st.session_state[f"{table}_df"] = db_operations.table_query(
-            f"Select * from {table}"
-        )
+def filter_df(df_name: str, **kwargs: Unpack[filterArgs]):
+    """
+    Perform groupby and summarize operations.
 
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame to perform groupby and perform operation on.
+    groupby_cols : List | str
+        List of columns or str of single column name to perform groupby operation.
+    return_cols : List | str
+        List of columns or str of single column name to return.
+    type : str, default="sum"
+        Type of summarization operation to perform.
 
-def filter_df(df_name, **kwargs):
+    Returns
+    -------
+    `pd.DataFrame` with summarized values.
+    """
     df = st.session_state[df_name]
+    # Currently setup for detailed_transactions_df, column names for other dataFrames might differ, so explicitly defining them.
     if df_name == "detailed_transactions_df":
         cols = {
             "account_types_filter": "transaction_account_type_name",
@@ -66,6 +62,7 @@ def filter_df(df_name, **kwargs):
             "inflow_filter": "transaction_amount",
             "cumulative_calculation": "transaction_amount",
         }
+
     if "account_types_filter" in kwargs.keys():
         if len(kwargs["account_types_filter"]) > 0:
             df = df[
@@ -74,6 +71,12 @@ def filter_df(df_name, **kwargs):
     if "accounts_filter" in kwargs.keys():
         if len(kwargs["accounts_filter"]) > 0:
             df = df[df[cols["accounts_filter"]].isin(kwargs["accounts_filter"])]
+    if "date_filter" in kwargs.keys():
+        df = df[
+            pd.to_datetime(df[cols["date_filter"]]).between(
+                kwargs["date_filter"][0], kwargs["date_filter"][1]
+            )
+        ]
     if "categories_types_filter" in kwargs.keys():
         if len(kwargs["categories_types_filter"]) > 0:
             df = df[
@@ -81,12 +84,6 @@ def filter_df(df_name, **kwargs):
                     kwargs["categories_types_filter"]
                 )
             ]
-    if "date_filter" in kwargs.keys():
-        df = df[
-            pd.to_datetime(df[cols["date_filter"]]).between(
-                kwargs["date_filter"][0], kwargs["date_filter"][1]
-            )
-        ]
     if "transaction_status_filter" in kwargs.keys():
         if kwargs["transaction_status_filter"] == "Completed Only":
             df = df[df[cols["transaction_status_filter"]] != "Pending"]
@@ -96,6 +93,7 @@ def filter_df(df_name, **kwargs):
     if "inflow_filter" in kwargs.keys():
         if kwargs["inflow_filter"]:
             df = df[((df[cols["inflow_filter"]] > 0))]
+    # Always last step to ensure the zero value (for time series graph) is at index 0.
     if "cumulative_calculation" in kwargs.keys():
         if kwargs["cumulative_calculation"]:
             cumulative_calc = df.sort_values("transaction_date")[
@@ -109,46 +107,94 @@ def filter_df(df_name, **kwargs):
                     "transaction_date": [df["transaction_date"].min()],
                     "transaction_amount_cumulative": [0],
                     "transaction_amount": [0],
+                    "transaction_merchant_name": [""],
                 }
             )
             df = pd.concat([zero_val_df, df])
-    return df
+    return df.reset_index(drop=True)
 
 
-def df_summary(df, groupby_cols, return_cols, type="sum"):
-    if type == "sum":
-        try:
-            df = pd.DataFrame(df.groupby(groupby_cols).sum()[return_cols]).reset_index()
-        except Exception as e:
-            print(e)
-            df = pd.DataFrame()
-    return df
+def df_summary(
+    df: pd.DataFrame,
+    groupby_cols: List | str,
+    return_cols: List | str,
+    type: str = "sum",
+) -> pd.DataFrame:
+    """
+    Perform groupby and summarize operations.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame to perform groupby and perform operation on.
+    groupby_cols : List | str
+        `List` of columns or `str` of single column name to perform groupby operation.
+    return_cols : List | str
+        `List` of columns or `str` of single column name to return.
+    type : str, default="sum"
+        Type of summarization operation to perform.
+
+    Returns
+    -------
+    `pd.DataFrame` with summarized values.
+    """
+    try:
+        # use getattr to avoid having if statements for each operation.
+        df = pd.DataFrame(getattr(df.groupby(groupby_cols), type)()[return_cols])
+    except Exception as e:
+        print(e)
+        df = pd.DataFrame()
+    return df.reset_index(drop=True)
 
 
 if "initial_db_check" not in st.session_state:
-    check_database_setup()
-
-get_database_tables(
-    [
-        "accounts",
-        "account_types",
+    for table in [
+        "event_logs",
+        "categories",
         "currencies",
         "currency_rates",
-        "categories",
-        "cashflow_transfers",
+        "accounts",
+        "account_types",
         "cashflow_transactions",
+        "cashflow_transfers",
         "rewards_accounts",
+        "rewards_categories",
+    ]:
+        if not db_operations.table_exists(table):
+            db_operations.table_create(table)
+            db_operations.create_table_trigger(table)
+            db_operations.insert_initial_values(table)
+    for view in [
         "detailed_accounts",
         "detailed_transactions",
         "detailed_transfers",
         "detailed_reward_accounts",
-    ]
-)
+    ]:
+        db_operations.create_table_view(view)
+    curr.check_and_update_currency_rates()
+    st.session_state["initial_db_check"] = "Complete"
+
+for table in [
+    "account_types",
+    "currencies",
+    "currency_rates",
+    "categories",
+    "detailed_accounts",
+    "detailed_transactions",
+    "detailed_transfers",
+    "detailed_reward_accounts",
+]:
+    if f"{table}_df" not in st.session_state:
+        st.session_state[f"{table}_df"] = db_operations.table_query(
+            f"Select * from {table}"
+        )
+
 
 st.title("Personal Finances Dashboard")
 dashboard_viz = st.container()
 
 block1 = dashboard_viz.columns(5)
+# Create all filters to use for visualizations
 account_types_filter = block1[0].multiselect(
     label="Account Types",
     options=st.session_state["detailed_accounts_df"]["account_type_name"].unique(),
@@ -191,7 +237,7 @@ transaction_status_filter = block1[4].selectbox(
     options=["Completed Only", "Complete + Pending"],
     index=0,
 )
-filter_args = {
+filter_args: filterArgs = {
     "account_types_filter": account_types_filter,
     "accounts_filter": accounts_filter,
     "date_filter": (start_date_filter, end_date_filter),
@@ -203,8 +249,9 @@ filter_args = {
 }
 
 block2 = dashboard_viz.columns([8, 2])
+# Spend path viz
 block2[0].subheader("Spend Path")
-spend_path_args = filter_args
+spend_path_args: filterArgs = filter_args
 sub_block2 = block2[0].columns(3)
 include_transfers = sub_block2[0].checkbox(label="Include Transfers")
 include_inflow = sub_block2[1].checkbox(label="Include Income")
@@ -217,7 +264,7 @@ spend_path_df = filter_df(df_name="detailed_transactions_df", **spend_path_args)
 spend_path_df["transaction_amount"] = spend_path_df["transaction_amount"].apply(
     lambda x: format_currency(x, base_currency)
 )
-spend_path_df["transaction_amount_cumulative"] = spend_path_df[
+spend_path_df["transaction_amount_cumulative_display"] = spend_path_df[
     "transaction_amount_cumulative"
 ].apply(lambda x: format_currency(x, base_currency))
 spend_path_fig = px.line(
@@ -228,11 +275,16 @@ spend_path_fig = px.line(
     line_shape="linear",
 )
 spend_path_fig.update_traces(
-    text=spend_path_df[["transaction_amount", "transaction_amount_cumulative"]],
-    customdata=spend_path_df["transaction_merchant_name"],
-    hovertemplate="<b>%{customdata}</b>"
+    text=spend_path_df[
+        [
+            "transaction_merchant_name",
+            "transaction_amount",
+            "transaction_amount_cumulative_display",
+        ]
+    ],
+    hovertemplate="<b>%{text[0]}</b>"
     + "<br><b>Transaction Amount:</b> %{text[1]}</br>"
-    + "<b>Cumulative Total:</b> %{text[0]}"
+    + "<b>Cumulative Total:</b> %{text[2]}"
     + "<br><b>Transaction Date:</b> %{x}</br>",
 )
 spend_path_fig.update_layout(
@@ -242,8 +294,9 @@ spend_path_fig.update_layout(
 block2[0].plotly_chart(spend_path_fig, use_container_width=True)
 
 block2[1].subheader("Current Balances")
+# Current account Balances Viz
 container2 = block2[1].container(height=400)
-current_balances_args = {
+current_balances_args: filterArgs = {
     k: filter_args[k]
     for k in ["account_types_filter", "date_filter"]
     if k in filter_args
@@ -281,12 +334,14 @@ for index, row in (
     )
 
 block3 = dashboard_viz.columns(2)
-category_spend_args = {
+#Category spend viz
+category_spend_args: filterArgs = {
     k: filter_args[k]
     for k in [
         "account_types_filter",
         "accounts_filter",
-        "transaction_status_filter" "transfers_filter",
+        "transaction_status_filter",
+        "transfers_filter",
         "inflow_filter",
         "date_filter",
         "cumulative_calculation",
