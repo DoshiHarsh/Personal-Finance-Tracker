@@ -328,7 +328,7 @@ for index, row in (
         -transactions_sum, row["account_currency"], locale="en_US"
     )
     container2.metric(
-        label=f"{row["account_name"]} :gray-background[:blue[{row["account_type_name"]}]]",
+        label=f"{row['account_name']} :gray-background[:blue[{row['account_type_name']}]]",
         value=current_balance,
         delta=balance_delta,
     )
