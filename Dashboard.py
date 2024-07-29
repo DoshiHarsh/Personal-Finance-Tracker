@@ -1,151 +1,23 @@
 import streamlit as st
-from core_components.database import ConnectDB
-from core_components.functions import Currencies
-import pandas as pd
+from core_components.functions import (
+    curr,
+    display_filter_ui,
+    db_operations,
+    df_summary,
+    filter_df,
+    filterArgs,
+    get_current_account_balances,
+)
 from babel.numbers import format_currency
 import plotly.express as px
-from datetime import datetime, timedelta
-from typing import Optional, List, Unpack, TypedDict, Tuple
+from datetime import timedelta
 
-db_operations = ConnectDB("budget_db")
-curr = Currencies(db_operations)
-base_currency = curr.get_base_currency()
-today = datetime.today()
 
 st.set_page_config(
     page_title="Budget tracking",
     layout="wide",
     initial_sidebar_state="expanded",
 )
-
-
-class filterArgs(TypedDict, total=False):
-    account_types_filter: List
-    accounts_filter: List
-    date_filter: Tuple[datetime, datetime]
-    categories_types_filter: List
-    transaction_status_filter: str
-    transfers_filter: bool
-    inflow_filter: bool
-    cumulative_calculation: bool
-
-
-def filter_df(df_name: str, **kwargs: Unpack[filterArgs]):
-    """
-    Perform groupby and summarize operations.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        DataFrame to perform groupby and perform operation on.
-    groupby_cols : List | str
-        List of columns or str of single column name to perform groupby operation.
-    return_cols : List | str
-        List of columns or str of single column name to return.
-    type : str, default="sum"
-        Type of summarization operation to perform.
-
-    Returns
-    -------
-    `pd.DataFrame` with summarized values.
-    """
-    df = st.session_state[df_name]
-    # Currently setup for detailed_transactions_df, column names for other dataFrames might differ, so explicitly defining them.
-    if df_name == "detailed_transactions_df":
-        cols = {
-            "account_types_filter": "transaction_account_type_name",
-            "accounts_filter": "transaction_account_name",
-            "categories_types_filter": "transaction_category_name",
-            "date_filter": "transaction_date",
-            "transaction_status_filter": "transaction_status",
-            "transfers_filter": "transaction_merchant_name",
-            "inflow_filter": "transaction_amount",
-            "cumulative_calculation": "transaction_amount",
-        }
-
-    if "account_types_filter" in kwargs.keys():
-        if len(kwargs["account_types_filter"]) > 0:
-            df = df[
-                df[cols["account_types_filter"]].isin(kwargs["account_types_filter"])
-            ]
-    if "accounts_filter" in kwargs.keys():
-        if len(kwargs["accounts_filter"]) > 0:
-            df = df[df[cols["accounts_filter"]].isin(kwargs["accounts_filter"])]
-    if "date_filter" in kwargs.keys():
-        df = df[
-            pd.to_datetime(df[cols["date_filter"]]).between(
-                kwargs["date_filter"][0], kwargs["date_filter"][1]
-            )
-        ]
-    if "categories_types_filter" in kwargs.keys():
-        if len(kwargs["categories_types_filter"]) > 0:
-            df = df[
-                df[cols["categories_types_filter"]].isin(
-                    kwargs["categories_types_filter"]
-                )
-            ]
-    if "transaction_status_filter" in kwargs.keys():
-        if kwargs["transaction_status_filter"] == "Completed Only":
-            df = df[df[cols["transaction_status_filter"]] != "Pending"]
-    if "transfers_filter" in kwargs.keys():
-        if kwargs["transfers_filter"]:
-            df = df[~df[cols["transfers_filter"]].astype(str).str.contains("Transfer")]
-    if "inflow_filter" in kwargs.keys():
-        if kwargs["inflow_filter"]:
-            df = df[((df[cols["inflow_filter"]] > 0))]
-    # Always last step to ensure the zero value (for time series graph) is at index 0.
-    if "cumulative_calculation" in kwargs.keys():
-        if kwargs["cumulative_calculation"]:
-            cumulative_calc = df.sort_values("transaction_date")[
-                "transaction_amount"
-            ].cumsum()
-            df = df.join(cumulative_calc, rsuffix="_cumulative").sort_values(
-                "transaction_date"
-            )
-            zero_val_df = pd.DataFrame(
-                {
-                    "transaction_date": [df["transaction_date"].min()],
-                    "transaction_amount_cumulative": [0],
-                    "transaction_amount": [0],
-                    "transaction_merchant_name": [""],
-                }
-            )
-            df = pd.concat([zero_val_df, df])
-    return df.reset_index(drop=True)
-
-
-def df_summary(
-    df: pd.DataFrame,
-    groupby_cols: List | str,
-    return_cols: List | str,
-    type: str = "sum",
-) -> pd.DataFrame:
-    """
-    Perform groupby and summarize operations.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        DataFrame to perform groupby and perform operation on.
-    groupby_cols : List | str
-        `List` of columns or `str` of single column name to perform groupby operation.
-    return_cols : List | str
-        `List` of columns or `str` of single column name to return.
-    type : str, default="sum"
-        Type of summarization operation to perform.
-
-    Returns
-    -------
-    `pd.DataFrame` with summarized values.
-    """
-    try:
-        # use getattr to avoid having if statements for each operation.
-        df = pd.DataFrame(getattr(df.groupby(groupby_cols), type)()[return_cols])
-    except Exception as e:
-        print(e)
-        df = pd.DataFrame()
-    return df.reset_index(drop=True)
-
 
 if "initial_db_check" not in st.session_state:
     for table in [
@@ -168,7 +40,7 @@ if "initial_db_check" not in st.session_state:
         "detailed_accounts",
         "detailed_transactions",
         "detailed_transfers",
-        "detailed_reward_accounts",
+        "detailed_rewards_accounts",
     ]:
         db_operations.create_table_view(view)
     curr.check_and_update_currency_rates()
@@ -182,180 +54,138 @@ for table in [
     "detailed_accounts",
     "detailed_transactions",
     "detailed_transfers",
-    "detailed_reward_accounts",
+    "detailed_rewards_accounts",
 ]:
     if f"{table}_df" not in st.session_state:
         st.session_state[f"{table}_df"] = db_operations.table_query(
             f"Select * from {table}"
         )
 
-
+st.session_state["current_account_balances_df"] = get_current_account_balances(
+    st.session_state["detailed_transactions_df"],
+    st.session_state["detailed_accounts_df"],
+)
+base_currency = curr.get_base_currency()
 st.title("Personal Finances Dashboard")
+filter_args = display_filter_ui(type="transaction_filters")
 dashboard_viz = st.container()
+block1 = dashboard_viz.columns([8, 3])
+block2 = dashboard_viz.columns(2)
 
-block1 = dashboard_viz.columns(5)
-# Create all filters to use for visualizations
-account_types_filter = block1[0].multiselect(
-    label="Account Types",
-    options=st.session_state["detailed_accounts_df"]["account_type_name"].unique(),
-)
-accounts_filter = block1[1].multiselect(
-    label="Account Filters",
-    options=st.session_state["detailed_accounts_df"]["account_name"].unique(),
-)
-date_filter = block1[2].selectbox(
-    label="Date Range",
-    options=["Current Month", "Last 30 Days", "Last 365 Days", "YTD", "Custom"],
-)
-if date_filter == "Custom":
-    start_date_filter = pd.to_datetime(
-        block1[1].date_input(label="Start Date", value="today")
+# Spend Path viz
+with block1[0]:
+    st.subheader("Spend Path", anchor=False)
+    spend_path_args = filter_args
+    spend_path_args["cumulative_calculation"] = True
+
+    spend_path_df = filter_df(df_name="detailed_transactions_df", **spend_path_args)
+    spend_path_df["transaction_amount"] = spend_path_df["transaction_amount"].apply(
+        lambda x: format_currency(x, base_currency)
     )
-    end_date_filter = pd.to_datetime(
-        block1[2].date_input(
-            label="End Date", value="today", min_value=start_date_filter
+    spend_path_df["transaction_amount_cumulative_display"] = spend_path_df[
+        "transaction_amount_cumulative"
+    ].apply(lambda x: format_currency(x, base_currency))
+
+    spend_path_fig = px.line(
+        spend_path_df,
+        x="transaction_date",
+        y="transaction_amount_cumulative",
+        markers=True,
+        line_shape="linear",
+    )
+    spend_path_fig.update_traces(
+        text=spend_path_df[
+            [
+                "transaction_merchant_name",
+                "transaction_amount",
+                "transaction_amount_cumulative_display",
+            ]
+        ],
+        hovertemplate="<b>%{text[0]}</b>"
+        + "<br><b>Transaction Amount:</b> %{text[1]}</br>"
+        + "<b>Cumulative Total:</b> %{text[2]}"
+        + "<br><b>Transaction Date:</b> %{x}</br>",
+    )
+    spend_path_fig.update_layout(
+        hoverlabel=dict(bgcolor="#0E1117", font_size=16, font_family="Sans Serif"),
+        xaxis_range=[
+            filter_args["date_filter"][0] - timedelta(1),
+            filter_args["date_filter"][1] + timedelta(1),
+        ],
+    )
+    st.plotly_chart(spend_path_fig, use_container_width=True)
+
+# Current Account Balances viz
+with block1[1]:
+    st.subheader("Current Balances", anchor=False)
+    con = st.container(height=400)
+    current_balances_args: filterArgs = {
+        k: filter_args[k] for k in ["date_filter"] if k in filter_args
+    }
+    
+    filtered_transactions_df = filter_df(
+        df_name="detailed_transactions_df", **current_balances_args
+    )
+    delta_total = df_summary(
+        filtered_transactions_df,
+        "transaction_account_id",
+        "transaction_amount",
+        "delta_transaction_amount",
+    )
+    balance_viz_df = st.session_state["current_account_balances_df"].merge(
+        delta_total, left_on="account_id", right_on="transaction_account_id", how="left"
+    )
+    balance_viz_df["delta_transaction_amount"] = balance_viz_df[
+        "delta_transaction_amount"
+    ].fillna(0.00)
+
+    for index, row in balance_viz_df.sort_values(
+        ["account_type_name", "account_name"]
+    ).iterrows():
+        current_balance = format_currency(
+            row["current_account_balance"],
+            row["account_currency"],
+            locale="en_US",
         )
-    )
-elif date_filter == "Current Month":
-    start_date_filter, end_date_filter = datetime(today.year, today.month, 1), datetime(
-        today.year, today.month, 1
-    ) + pd.offsets.MonthEnd(1)
-elif date_filter == "Last 30 Days":
-    start_date_filter, end_date_filter = today - timedelta(30), today
-elif date_filter == "Last 365 Days":
-    start_date_filter, end_date_filter = today - timedelta(365), today
-elif date_filter == "YTD":
-    start_date_filter, end_date_filter = datetime(today.year, 1, 1), today
-categories_types_filter = block1[3].multiselect(
-    label="Categories",
-    options=st.session_state["detailed_transactions_df"][
-        "transaction_category_name"
-    ].unique(),
-)
-transaction_status_filter = block1[4].selectbox(
-    label="Transaction Status",
-    options=["Completed Only", "Complete + Pending"],
-    index=0,
-)
-filter_args: filterArgs = {
-    "account_types_filter": account_types_filter,
-    "accounts_filter": accounts_filter,
-    "date_filter": (start_date_filter, end_date_filter),
-    "categories_types_filter": categories_types_filter,
-    "transaction_status_filter": transaction_status_filter,
-    "transfers_filter": False,
-    "inflow_filter": False,
-    "cumulative_calculation": False,
-}
+        balance_delta = format_currency(
+            -row["delta_transaction_amount"],
+            row["account_currency"],
+            locale="en_US",
+        )
+        color_toggle = "off" if -row["delta_transaction_amount"] == 0 else "normal"
+        con.metric(
+            label=f"{row['account_name']} :gray-background[:blue[{row['account_type_name']}]]",
+            value=current_balance,
+            delta=balance_delta,
+            delta_color=color_toggle,
+        )
 
-block2 = dashboard_viz.columns([8, 2])
-# Spend path viz
-block2[0].subheader("Spend Path")
-spend_path_args: filterArgs = filter_args
-sub_block2 = block2[0].columns(3)
-include_transfers = sub_block2[0].checkbox(label="Include Transfers")
-include_inflow = sub_block2[1].checkbox(label="Include Income")
-if not include_transfers:
-    spend_path_args["transfers_filter"] = True
-if not include_inflow:
-    spend_path_args["inflow_filter"] = True
-spend_path_args["cumulative_calculation"] = True
-spend_path_df = filter_df(df_name="detailed_transactions_df", **spend_path_args)
-spend_path_df["transaction_amount"] = spend_path_df["transaction_amount"].apply(
-    lambda x: format_currency(x, base_currency)
-)
-spend_path_df["transaction_amount_cumulative_display"] = spend_path_df[
-    "transaction_amount_cumulative"
-].apply(lambda x: format_currency(x, base_currency))
-spend_path_fig = px.line(
-    spend_path_df,
-    x="transaction_date",
-    y="transaction_amount_cumulative",
-    markers=True,
-    line_shape="linear",
-)
-spend_path_fig.update_traces(
-    text=spend_path_df[
-        [
-            "transaction_merchant_name",
-            "transaction_amount",
-            "transaction_amount_cumulative_display",
+# Category Spend viz
+with block2[0]:
+    st.subheader("Spending by Category", anchor=False)
+    category_spend_args: filterArgs = {
+        k: filter_args[k]
+        for k in [
+            "account_types_filter",
+            "accounts_filter",
+            "transaction_status_filter",
+            "transfers_filter",
+            "inflow_filter",
+            "date_filter",
+            "cumulative_calculation",
         ]
-    ],
-    hovertemplate="<b>%{text[0]}</b>"
-    + "<br><b>Transaction Amount:</b> %{text[1]}</br>"
-    + "<b>Cumulative Total:</b> %{text[2]}"
-    + "<br><b>Transaction Date:</b> %{x}</br>",
-)
-spend_path_fig.update_layout(
-    hoverlabel=dict(bgcolor="#0E1117", font_size=16, font_family="Sans Serif"),
-    xaxis_range=[start_date_filter - timedelta(1), end_date_filter + timedelta(1)],
-)
-block2[0].plotly_chart(spend_path_fig, use_container_width=True)
+        if k in filter_args
+    }
+    category_spend_args["transfers_filter"] = False
 
-block2[1].subheader("Current Balances")
-# Current account Balances Viz
-container2 = block2[1].container(height=400)
-current_balances_args: filterArgs = {
-    k: filter_args[k]
-    for k in ["account_types_filter", "date_filter"]
-    if k in filter_args
-}
-current_balances_df = filter_df(
-    df_name="detailed_transactions_df", **current_balances_args
-)
-account_total = df_summary(
-    current_balances_df, "transaction_account_id", "transaction_amount"
-)
-for index, row in (
-    st.session_state["detailed_accounts_df"]
-    .sort_values(["account_type_name", "account_name"])
-    .iterrows()
-):
-    try:
-        transactions_sum = account_total.loc[
-            account_total["transaction_account_id"] == row["account_id"],
-            "transaction_amount",
-        ].iloc[0]
-    except Exception:
-        transactions_sum = 0
-    current_balance = format_currency(
-        row["account_starting_balance"] - transactions_sum,
-        row["account_currency"],
-        locale="en_US",
-    )
-    balance_delta = format_currency(
-        -transactions_sum, row["account_currency"], locale="en_US"
-    )
-    container2.metric(
-        label=f"{row['account_name']} :gray-background[:blue[{row['account_type_name']}]]",
-        value=current_balance,
-        delta=balance_delta,
+    category_spend_df = filter_df(
+        df_name="detailed_transactions_df", **category_spend_args
     )
 
-block3 = dashboard_viz.columns(2)
-#Category spend viz
-category_spend_args: filterArgs = {
-    k: filter_args[k]
-    for k in [
-        "account_types_filter",
-        "accounts_filter",
-        "transaction_status_filter",
-        "transfers_filter",
-        "inflow_filter",
-        "date_filter",
-        "cumulative_calculation",
-    ]
-    if k in filter_args
-}
-if not include_transfers:
-    spend_path_args["inflow_filter"] = True
-category_spend_args["transfers_filter"] = True
-category_spend_df = filter_df(df_name="detailed_transactions_df", **category_spend_args)
-category_spend_fig = px.bar(
-    category_spend_df, "transaction_category_name", "transaction_amount"
-)
-category_spend_fig.update_layout(
-    hoverlabel=dict(bgcolor="#0E1117", font_size=16, font_family="Sans Serif")
-)
-block3[0].plotly_chart(category_spend_fig, use_container_width=True)
+    category_spend_fig = px.bar(
+        category_spend_df, "transaction_category_name", "transaction_amount"
+    )
+    category_spend_fig.update_layout(
+        hoverlabel=dict(bgcolor="#0E1117", font_size=16, font_family="Sans Serif")
+    )
+    st.plotly_chart(category_spend_fig, use_container_width=True)

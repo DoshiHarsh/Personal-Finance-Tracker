@@ -1,131 +1,38 @@
 import streamlit as st
+from core_components.functions import db_operations
 import pandas as pd
-from core_components.functions import populate_list
-from Dashboard import db_operations
-
-
-@st.experimental_dialog("Add new Transaction", width="large")
-def new_transaction_dialog():
-    """
-    Create dialog box UI to create new transaction.
-    """
-    with st.container():
-        block1 = st.columns([3, 3, 2])
-        merchant = block1[0].selectbox(
-            "Merchant/Location",
-            options=populate_list(
-                st.session_state["detailed_transactions_df"][
-                    "transaction_merchant_name"
-                ]
-            )
-        )
-        # New values cannot be typed in selectbox, thus creating new field.
-        if merchant == "<New value>":
-            new_merchant = block1[0].text_input("Add new Merchant/Location")
-            final_merchant = new_merchant
-        else:
-            final_merchant = merchant
-        account_name = block1[1].selectbox(
-            "Account", options=st.session_state["detailed_accounts_df"]["account_name"]
-        )
-        account_details = st.session_state["detailed_accounts_df"][
-            st.session_state["detailed_accounts_df"]["account_name"] == account_name
-        ].reset_index(drop=True)
-        transaction_date = block1[2].date_input(label="Transaction Date", value="today")
-
-        block2 = st.columns(2)
-        category = block2[0].selectbox(
-            "Category",
-            options=st.session_state["categories_df"]["category_name"].sort_values(),
-        )
-        category_details = st.session_state["categories_df"][
-            st.session_state["categories_df"]["category_name"] == category
-        ].reset_index(drop=True)
-        sub_category = block2[1].selectbox(
-            "Sub Category",
-            options=populate_list(
-                st.session_state["detailed_transactions_df"]["transaction_sub_category"]
-            ),
-        )
-        # New values cannot be typed in selectbox, thus creating new field.
-        if sub_category == "<New value>":
-            new_sub_category = block2[1].text_input("Add new Sub Category")
-            final_sub_category = new_sub_category
-        else:
-            final_sub_category = sub_category
-
-        block3 = st.columns(2)
-        transaction_currency = block3[0].selectbox(
-            "Currency",
-            options=account_details["account_currency"],
-            index=0,
-            disabled=True,
-        )
-        transaction_amount = block3[0].number_input("Amount", value=0.00)
-        rewards_enabled = account_details["account_rewards"][0]
-        if rewards_enabled:
-            rewards_account_id = st.session_state["detailed_accounts_df"][
-                st.session_state["detailed_accounts_df"]["linked_account_id"]
-                == account_details["account_id"][0]
-            ].reset_index(drop=True)["rewards_account_id"][0]
-        else:
-            rewards_account_id = None
-        rewards_percentage = block3[1].number_input(
-            "Rewards Percentage (%)", value=0.00, step=0.5, disabled=not rewards_enabled
-        )
-        rewards_calculation = round(transaction_amount * (rewards_percentage / 100), 2)
-        rewards_amount = block3[1].number_input(
-            "Rewards Amount", value=rewards_calculation, disabled=not rewards_enabled
-        )
-        transaction_total = float(transaction_amount - rewards_amount)
-
-        transaction_notes = st.text_area(label="Transaction Notes")
-        submit_enabled = (
-            final_merchant
-            and account_name
-            and transaction_currency
-            and category
-            and transaction_amount
-        )
-        if st.button("Add Transaction", disabled=not submit_enabled):
-            new_transaction = pd.DataFrame(
-                {
-                    "transaction_merchant_name": [final_merchant],
-                    "transaction_account_id": [account_details["account_id"][0]],
-                    "transaction_date": [transaction_date],
-                    "transaction_category_id": [category_details["category_id"][0]],
-                    "transaction_sub_category": [final_sub_category],
-                    "transaction_currency": [transaction_currency],
-                    "transaction_amount": [transaction_amount],
-                    "rewards_account_id": [(rewards_account_id)],
-                    "rewards_percentage": [
-                        round((rewards_amount / transaction_amount) * 100, 2)
-                    ],
-                    "rewards_amount": [rewards_amount],
-                    "transaction_total": [transaction_total],
-                    "transaction_notes": [transaction_notes],
-                    "transaction_status": ["Pending"],
-                }
-            )
-            db_operations.table_insert(
-                table_name="cashflow_transactions", df=new_transaction
-            )
-            del st.session_state["detailed_transactions_df"]
-            st.rerun()
+from core_components.functions import (
+    display_card_ui,
+    display_filter_ui,
+    transaction_dialog,
+    filter_df,
+    get_current_account_balances,
+)
 
 
 # Due to unknown limitation, setting values to st.session_state with function defined in another script doesn't always execute.
-for table in ["detailed_transactions"]:
+for table in ["detailed_transactions", "detailed_accounts", "categories"]:
     if f"{table}_df" not in st.session_state:
         st.session_state[f"{table}_df"] = db_operations.table_query(
             f"Select * from {table}"
         )
 
-st.title("Transactions")
+st.session_state["current_account_balances_df"] = get_current_account_balances(
+    st.session_state["detailed_transactions_df"],
+    st.session_state["detailed_accounts_df"],
+)
 
-block1 = st.columns([7, 2])
-if block1[1].button("Add new Transaction", use_container_width=True):
-    new_transaction_dialog()
+st.session_state["detailed_transactions_df"]["transaction_date"] = pd.to_datetime(
+    st.session_state["detailed_transactions_df"]["transaction_date"]
+)
 
-# Display the transactions dataframe. (to be replaced with Card UI)
-st.dataframe(st.session_state["detailed_transactions_df"], hide_index=True)
+block0 = st.columns([6, 2], vertical_alignment="bottom")
+block0[0].title("Transactions")
+block0[1].button(
+    "New Transaction", on_click=transaction_dialog, use_container_width=True
+)
+card_ui_args = display_filter_ui(type="transaction_filters")
+transactions_df = filter_df(
+    df_name="detailed_transactions_df", **card_ui_args
+).sort_values("transaction_date", ascending=False)
+display_card_ui(display_df=transactions_df, type="transactions")

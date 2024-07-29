@@ -1,4 +1,4 @@
-{"databases":{
+{"tables":{
     "accounts":{
         "account_id" : "INTEGER PRIMARY KEY AUTOINCREMENT",
         "account_name" : "TEXT UNIQUE NOT NULL",
@@ -20,7 +20,7 @@
     },
     "cashflow_transactions":{
         "transaction_id" : "INTEGER PRIMARY KEY AUTOINCREMENT",
-        "transaction_date" : "INTEGER DEFAULT CURRENT_DATE",
+        "transaction_date" : "REAL DEFAULT CURRENT_DATE",
         "transaction_merchant_name" : "TEXT NOT NULL",
         "transaction_account_id" : "INTEGER NOT NULL",
         "transaction_currency" : "TEXT NOT NULL",
@@ -33,11 +33,12 @@
         "transaction_notes" : "TEXT",
         "transaction_category_id" :  "INTEGER NOT NULL",
         "transaction_sub_category" : "TEXT",
+        "transfer_id" : "INTEGER",
         "allocation_goal_id" : "INTEGER"
     },
     "cashflow_transfers":{
         "transfer_id" : "INTEGER PRIMARY KEY AUTOINCREMENT",
-        "transfer_date" : "INTEGER DEFAULT CURRENT_DATE",
+        "transfer_date" : "REAL DEFAULT CURRENT_DATE",
         "origin_account_id" : "INTEGER NOT NULL",
         "destination_account_id" : "INTEGER NOT NULL",
         "origin_send_amount" : "FLOAT DEFAULT 0.0",
@@ -62,7 +63,7 @@
         "currency_abbr" : "TEXT NOT NULL",
         "currency_rate" : "FLOAT",
         "base_currency" : "TEXT NOT NULL",
-        "currency_update_timestamp" : "INTEGER DEFAULT CURRENT_TIMESTAMP"
+        "currency_update_timestamp" : "REAL DEFAULT CURRENT_TIMESTAMP"
     },
     "rewards_accounts":{
         "rewards_account_id" : "INTEGER PRIMARY KEY AUTOINCREMENT",
@@ -126,9 +127,9 @@
     }
 },
 "views":{
-    "detailed_accounts" : "CREATE VIEW detailed_accounts AS SELECT A.*, AT.account_type_name account_type_name FROM accounts A LEFT JOIN account_types AT ON A.account_type_id = AT.account_type_id",
+    "detailed_accounts" : "CREATE VIEW detailed_accounts AS SELECT A.*, AT.account_type_name account_type_name, R.rewards_account_id ,R.rewards_type, R.rewards_point_value, R.starting_rewards_balance FROM accounts A LEFT JOIN account_types AT ON A.account_type_id = AT.account_type_id LEFT JOIN rewards_accounts R on R.linked_account_id = A.account_id",
     "detailed_transactions" : "CREATE VIEW detailed_transactions AS SELECT T.*, A.account_name as transaction_account_name, AT.account_type_name as transaction_account_type_name, C.category_logo as transaction_category_logo, C.category_name as transaction_category_name FROM cashflow_transactions T LEFT JOIN accounts A ON T.transaction_account_id = A.account_id LEFT JOIN account_types AT ON A.account_type_id = AT.account_type_id LEFT JOIN categories C ON T.transaction_category_id = C.category_id",
     "detailed_transfers" : "CREATE VIEW detailed_transfers AS SELECT T.*, A.account_name as origin_account_name, B.account_name as destination_account_name, AT.account_type_name as origin_account_type_name, BT.account_type_name as destination_account_type_name FROM cashflow_transfers T LEFT JOIN accounts A ON T.origin_account_id = A.account_id LEFT JOIN account_types AT ON A.account_type_id = AT.account_type_id LEFT JOIN accounts B ON T.destination_account_id = B.account_id LEFT JOIN account_types BT ON B.account_type_id = BT.account_type_id",
-    "detailed_reward_accounts" : "CREATE VIEW detailed_reward_accounts as SELECT R.*, A.account_name as linked_account_name, AT.account_type_name as linked_account_type_name FROM rewards_accounts R LEFT JOIN accounts A on R.linked_account_id = A.account_id LEFT JOIN account_types AT on A.account_type_id = AT.account_type_id"
+    "detailed_rewards_accounts" : "CREATE VIEW detailed_rewards_accounts as SELECT R.*, A.account_name as linked_account_name, AT.account_type_name as linked_account_type_name FROM rewards_accounts R LEFT JOIN accounts A on R.linked_account_id = A.account_id LEFT JOIN account_types AT on A.account_type_id = AT.account_type_id"
 }
 }

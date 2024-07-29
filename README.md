@@ -18,10 +18,10 @@ To add dummy data while initialization for the first run, please replace the val
 
 ## Current features
 
-- Create transaction categories and accounts in multiple currencies.
-- Track reward points, miles and dollars (or local equivalent) on your credit cards.
-- And add transactions to add your expenses and income.
-- Transfer money between accounts with currency rate conversion and origin/destination transfer fees.
+- Create, edit, and delete categories and accounts.
+- Track reward points, miles and dollars (or local equivalent) on your reward accounts.
+- Add transactions for your expenses and income.
+- Transfer money between accounts with currency rate conversions and origin/destination transfer fees.
 - Visualize spending, current account balances and spend by category over time.
 
 
@@ -36,19 +36,19 @@ To add dummy data while initialization for the first run, please replace the val
 
 For a up to date overview of completed, planned work and priorities visit the [Project Board](https://github.com/users/DoshiHarsh/projects/2/views/2).
 
-- User Authentication
-    - Email login
-    - Password Reset
-    - Secure database connection and files
-
-- Card UI
-    - Card UI for viewing transaction/accounts/categories
-    - Edit/delete values transaction/accounts/categories
-
 - Account reconciliation
     - See last reconciled amounts and dates.
     - View and edit transactions since last reconciliation
     - Override and update original starting balance by adding current accurate value.
+
+- Spending and Saving goals
+    - Automatic allocations towards goals from income (Monthly/ Yearly/ Per paycheck)
+    - Transactions tagged towards spending goals
+
+- User Authentication
+    - Email login
+    - Password Reset
+    - Secure database connection and files
 
 - Investment tracking
     - Investment account creations/fields
@@ -56,10 +56,6 @@ For a up to date overview of completed, planned work and priorities visit the [P
     - RSU/Stock options transactions
     - Update current value of investment assets (as of date)
     - Net worth progress 
-
-- Spending and Saving goals
-    - Automatic allocations towards goals from income (Monthly/ Yearly/ Per paycheck)
-    - Transactions tagged towards spending goals
    
 - Currency support enhancements
     - Convert all currencies to base currency
@@ -156,3 +152,9 @@ Currency rates implemented using Free API from [Exchange Rate API](https://www.e
     - https://stackoverflow.com/questions/55301343/how-to-define-the-structure-of-a-sankey-diagram-using-a-pandas-dataframe
     - https://medium.com/streamlit/paginating-dataframes-with-streamlit-2da29b080920
 
+- Services:
+    - https://heliohost.org/tommy/#donate
+    - https://aiven.io/docs/platform/concepts/free-plan#free-plan-features-and-limitations
+
+- Miscellaneous:
+    - https://towardsdatascience.com/part-1-a-guide-for-optimizing-your-data-science-workflow-53add6481556
