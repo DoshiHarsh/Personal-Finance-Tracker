@@ -108,6 +108,8 @@ For a up to date overview of completed, planned work and priorities visit the [P
     - Ability to add rewards as statement credit during transactions
     - Ability to use reward points as payment method for transactions
     - Ability to transfer rewards points to bank/ credit card accounts
+    - Toggle to use transaction amount - reward balances or transaction amounts
+    - Visualize and track reward account balances
 
 - Automation Goals (Long-Term)
     - OCR/AI model to read and add transactions from statements
