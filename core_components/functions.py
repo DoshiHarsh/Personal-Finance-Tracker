@@ -27,7 +27,7 @@ class filterArgs(TypedDict, total=False):
     inflow_filter: bool
     cumulative_calculation: bool
     origin_account_filter: List
-    destination_account_filter: List    
+    destination_account_filter: List
 
 
 class Currencies:
@@ -243,7 +243,7 @@ def filter_df(df_name: str, **kwargs: Unpack[filterArgs]) -> pd.DataFrame:
     ----------
     df_name: str, ["detailed_accounts_df", "current_account_balances_df", "detailed_transactions_df", "detailed_transfers_df"]
         DataFrame to perform filter operations on.
-    
+
     **kwargs: Unpack[filterArgs]
         TypedDict with filters to apply on the DataFrame.
 
@@ -392,22 +392,22 @@ def df_summary(
     type: str = "sum",
 ) -> pd.DataFrame:
     """
-    Perform groupby and summarize operations with optional renaming for output columns. 
+    Perform groupby and summarize operations with optional renaming for output columns.
 
     Parameters
     ----------
     df: pd.DataFrame
         DataFrame to perform groupby and perform operation on.
-    
+
     groupby_cols: List | str
         List of columns or str of single column name to perform groupby operation.
-    
+
     return_cols: List | str
         List of columns or str of single column name to return.
-    
+
     rename_return_cols: Optional[List | str], default=None
         List or str to rename output columns, must match length of `return_cols`.
-    
+
     type: str, default="sum"
         Type of summarization operation to perform.
 
@@ -436,7 +436,9 @@ def df_summary(
     return df
 
 
-def get_current_account_balances(transactions_df: pd.DataFrame, accounts_df: pd.DataFrame) -> pd.DataFrame:
+def get_current_account_balances(
+    transactions_df: pd.DataFrame, accounts_df: pd.DataFrame
+) -> pd.DataFrame:
     """
     Add column with current account balances to accounts DataFrame by summing all transactions for each account.
 
@@ -444,7 +446,7 @@ def get_current_account_balances(transactions_df: pd.DataFrame, accounts_df: pd.
     ----------
     transactions_df: pd.DataFrame
         DataFrame with all transactions.
-    
+
     accounts_df: pd.DataFrame
         DataFrame with all accounts.
 
@@ -458,19 +460,23 @@ def get_current_account_balances(transactions_df: pd.DataFrame, accounts_df: pd.
         "transaction_amount",
         "total_transaction_amount",
     )
-    balances_df = accounts_df.merge(
-        transactions_sum,
-        left_on="account_id",
-        right_on="transaction_account_id",
-        how="left",
-    )
-    balances_df["total_transaction_amount"] = balances_df[
-        "total_transaction_amount"
-    ].fillna(0.00)
-    balances_df["current_account_balance"] = (
-        balances_df["account_starting_balance"]
-        - balances_df["total_transaction_amount"]
-    )
+    if len(accounts_df) > 0 and len(transactions_sum) > 0:
+        balances_df = accounts_df.merge(
+            transactions_sum,
+            left_on="account_id",
+            right_on="transaction_account_id",
+            how="left",
+        )
+        balances_df["total_transaction_amount"] = balances_df[
+            "total_transaction_amount"
+        ].fillna(0.00)
+        balances_df["current_account_balance"] = (
+            balances_df["account_starting_balance"]
+            - balances_df["total_transaction_amount"]
+        )
+    else:
+        balances_df = accounts_df
+        balances_df[["current_account_balance", "total_transaction_amount"]] = None
     return balances_df
 
 
@@ -495,7 +501,7 @@ def populate_list(series: pd.Series, values: str | List = ["<New value>"]) -> np
     return pd.concat([pd.Series(values), series]).unique()
 
 
-def get_index(row: pd.Series, val: str | int ) -> Optional[int]:
+def get_index(row: pd.Series, val: str | int) -> Optional[int]:
     """
     Get index for an element in a pd.Series.
 
@@ -503,13 +509,13 @@ def get_index(row: pd.Series, val: str | int ) -> Optional[int]:
     ----------
     row: pd.Series
         Input Series to lookup value.
-    
+
     val: str| int
         Value to lookup in `row`.
 
     Returns
     -------
-    `int` with summarized values. `None` if not found or error.    
+    `int` with summarized values. `None` if not found or error.
     """
     try:
         ind = np.where(row == val)[0][0]
@@ -527,7 +533,7 @@ def category_dialog(row: Optional[dict] = None) -> None:
     ----------
     row: Optional[dict]
         Optional dictionary with values to pre-fill dialog box fields with. Used while editing existing records.
-    
+
     Returns
     ----------
     `None`
@@ -535,10 +541,10 @@ def category_dialog(row: Optional[dict] = None) -> None:
     if not isinstance(row, dict):
         row = dict()
     with st.container():
-        category_logo = st.text_input("Logo", value=row.get("category_logo"))
+        category_logo = st.text_input("Logo", value=row.get("category_logo"),max_chars=1)
         category_name = st.text_input("Category Name", value=row.get("category_name"))
         submit_enabled = category_name
-
+        ### Does not work
         if not category_logo or category_logo == "":
             category_logo = None
 
@@ -556,7 +562,7 @@ def category_dialog(row: Optional[dict] = None) -> None:
                 ].unique()
                 else True
             )
-            if block1[0].button(
+            if block1[1].button(
                 "Update Category",
                 disabled=not submit_enabled,
                 use_container_width=True,
@@ -567,24 +573,30 @@ def category_dialog(row: Optional[dict] = None) -> None:
                     val=row.get("category_id"),
                     df=category,
                 )
-                # Need to rerun so that  option values get updated.
-                del st.session_state["categories_df"]
-                st.rerun()
-            if block1[1].button(
-                "Delete Category",
-                disabled=not delete_enabled,
-                type="primary",
-                use_container_width=True,
-            ):
-                db_operations.table_delete(
-                    table_name="categories",
-                    id_col="category_id",
-                    val=row.get("category_id"),
+                # Need to rerun so that option values get updated.
+                del (
+                    st.session_state["categories_df"],
+                    st.session_state["detailed_transactions_df"],
                 )
-                del st.session_state["categories_df"]
                 st.rerun()
+            with block1[0].popover(
+                "Delete Category", use_container_width=True, disabled=not delete_enabled
+            ):
+                if st.button(
+                    "Delete Category",
+                    disabled=not delete_enabled,
+                    type="primary",
+                    use_container_width=True,
+                ):
+                    db_operations.table_delete(
+                        table_name="categories",
+                        id_col="category_id",
+                        val=row.get("category_id"),
+                    )
+                    del st.session_state["categories_df"]
+                    st.rerun()
         else:
-            if block1[0].button(
+            if block1[1].button(
                 "Add Category", disabled=not submit_enabled, use_container_width=True
             ):
                 db_operations.table_insert(table_name="categories", df=category)
@@ -601,7 +613,7 @@ def account_dialog(row: Optional[dict] = None) -> None:
     ----------
     row: Optional[dict]
         Optional dictionary with values to pre-fill dialog box fields with. Used while editing existing records.
-    
+
     Returns
     ----------
     `None`
@@ -716,7 +728,7 @@ def account_dialog(row: Optional[dict] = None) -> None:
         block3 = st.columns(2)
         if row.get("account_id"):
             button_name = "Edit Account" if row.get("is_active") else "Activate Account"
-            if block3[0].button(
+            if block3[1].button(
                 button_name, disabled=not submit_enabled, use_container_width=True
             ):
                 db_operations.table_update(
@@ -752,32 +764,33 @@ def account_dialog(row: Optional[dict] = None) -> None:
                 )
                 st.rerun()
             deactivate_enabled = row.get("is_active")
-            if block3[1].button(
-                "Deactivate Account",
-                disabled=not deactivate_enabled,
-                use_container_width=True,
-                type="primary",
-            ):
-                deactivate_df = pd.DataFrame({"is_active": [False]})
-                db_operations.table_update(
-                    table_name="accounts",
-                    id_col="account_id",
-                    val=row.get("account_id"),
-                    df=deactivate_df,
-                )
-                db_operations.table_update(
-                    table_name="rewards_accounts",
-                    id_col="linked_account_id",
-                    val=row.get("account_id"),
-                    df=deactivate_df,
-                )
-                del (
-                    st.session_state["detailed_accounts_df"],
-                    st.session_state["detailed_rewards_accounts_df"],
-                )
-                st.rerun()
+            with block3[0].popover("Deactivate Account", use_container_width=True):
+                if st.button(
+                    "Deactivate Account",
+                    disabled=not deactivate_enabled,
+                    use_container_width=True,
+                    type="primary",
+                ):
+                    deactivate_df = pd.DataFrame({"is_active": [False]})
+                    db_operations.table_update(
+                        table_name="accounts",
+                        id_col="account_id",
+                        val=row.get("account_id"),
+                        df=deactivate_df,
+                    )
+                    db_operations.table_update(
+                        table_name="rewards_accounts",
+                        id_col="linked_account_id",
+                        val=row.get("account_id"),
+                        df=deactivate_df,
+                    )
+                    del (
+                        st.session_state["detailed_accounts_df"],
+                        st.session_state["detailed_rewards_accounts_df"],
+                    )
+                    st.rerun()
         else:
-            if block3[0].button(
+            if block3[1].button(
                 "Add Account", disabled=not submit_enabled, use_container_width=True
             ):
                 db_operations.table_insert(table_name="accounts", df=account)
@@ -805,7 +818,7 @@ def transaction_dialog(row: Optional[dict] = None) -> None:
     ----------
     row: Optional[dict]
         Optional dictionary with values to pre-fill dialog box fields with. Used while editing existing records.
-    
+
     Returns
     ----------
     `None`
@@ -896,12 +909,14 @@ def transaction_dialog(row: Optional[dict] = None) -> None:
             final_sub_category = new_sub_category
         else:
             final_sub_category = sub_category
+        status_options_emoji = pd.Series(["⏳ Pending", "✅ Complete"])
         status_options = pd.Series(["Pending", "Complete"])
         status = block2[2].selectbox(
             "Transaction Status",
-            options=status_options,
+            options=status_options_emoji,
             index=(get_index(status_options, row.get("transaction_status")) or 0),
         )
+        status = status[2:]
 
         block3 = st.columns(2)
         transaction_currency = block3[0].selectbox(
@@ -971,9 +986,9 @@ def transaction_dialog(row: Optional[dict] = None) -> None:
                     "transfer_id": [None],
                 }
             )
-        block4 = st.columns(4)
+        block4 = st.columns(3)
         if row.get("transaction_id"):
-            if block4[0].button(
+            if block4[2].button(
                 "Update Transaction",
                 disabled=not submit_enabled,
                 use_container_width=True,
@@ -986,21 +1001,22 @@ def transaction_dialog(row: Optional[dict] = None) -> None:
                 )
                 del st.session_state["detailed_transactions_df"]
                 st.rerun()
-            if block4[3].button(
-                "Delete Transaction",
-                disabled=not submit_enabled,
-                type="primary",
-                use_container_width=True,
-            ):
-                db_operations.table_delete(
-                    table_name="cashflow_transactions",
-                    id_col="transaction_id",
-                    val=row.get("transaction_id"),
-                )
-                del st.session_state["detailed_transactions_df"]
-                st.rerun()
+            with block4[0].popover("Delete Transaction", use_container_width=True):
+                if st.button(
+                    "Delete Transaction",
+                    disabled=not submit_enabled,
+                    type="primary",
+                    use_container_width=True,
+                ):
+                    db_operations.table_delete(
+                        table_name="cashflow_transactions",
+                        id_col="transaction_id",
+                        val=row.get("transaction_id"),
+                    )
+                    del st.session_state["detailed_transactions_df"]
+                    st.rerun()
         else:
-            if block4[0].button(
+            if block4[2].button(
                 "Add Transaction", disabled=not submit_enabled, use_container_width=True
             ):
                 db_operations.table_insert(
@@ -1019,7 +1035,7 @@ def transfer_dialog(row: Optional[dict] = None) -> None:
     ----------
     row: Optional[dict]
         Optional dictionary with values to pre-fill dialog box fields with. Used while editing existing records.
-    
+
     Returns
     ----------
     `None`
@@ -1201,9 +1217,9 @@ def transfer_dialog(row: Optional[dict] = None) -> None:
                     "transfer_id": [row.get("transfer_id")] * 2,
                 }
             )
-        block5 = st.columns(4)
+        block5 = st.columns(3)
         if row.get("transfer_id"):
-            if block5[0].button(
+            if block5[2].button(
                 "Update Transfer",
                 disabled=not submit_enabled,
                 use_container_width=True,
@@ -1231,29 +1247,30 @@ def transfer_dialog(row: Optional[dict] = None) -> None:
                     st.session_state["detailed_transfers_df"],
                 )
                 st.rerun()
-            if block5[3].button(
-                "Delete Transfer",
-                disabled=not submit_enabled,
-                type="primary",
-                use_container_width=True,
-            ):
-                db_operations.table_delete(
-                    table_name="cashflow_transfers",
-                    id_col="transfer_id",
-                    val=row.get("transfer_id"),
-                )
-                db_operations.table_delete(
-                    table_name="cashflow_transactions",
-                    id_col="transfer_id",
-                    val=row.get("transfer_id"),
-                )
-                del (
-                    st.session_state["detailed_transactions_df"],
-                    st.session_state["detailed_transfers_df"],
-                )
-                st.rerun()
+            with block5[0].popover("Delete Transfer", use_container_width=True):
+                if st.button(
+                    "Delete Transfer",
+                    disabled=not submit_enabled,
+                    type="primary",
+                    use_container_width=True,
+                ):
+                    db_operations.table_delete(
+                        table_name="cashflow_transfers",
+                        id_col="transfer_id",
+                        val=row.get("transfer_id"),
+                    )
+                    db_operations.table_delete(
+                        table_name="cashflow_transactions",
+                        id_col="transfer_id",
+                        val=row.get("transfer_id"),
+                    )
+                    del (
+                        st.session_state["detailed_transactions_df"],
+                        st.session_state["detailed_transfers_df"],
+                    )
+                    st.rerun()
         else:
-            if block5[0].button(
+            if block5[2].button(
                 "Add Transfer", disabled=not submit_enabled, use_container_width=True
             ):
                 db_operations.table_insert(table_name="cashflow_transfers", df=transfer)
@@ -1279,13 +1296,13 @@ def split_frame(df: pd.DataFrame, current_page: int, max_per_page: int) -> pd.Da
     ----------
     df: pd.DataFrame
         DataFrame to paginate.
-    
+
     current_page: int
         Page offset for paginated output.
-    
+
     max_per_page: int
-        Page size for paginated output. 
-    
+        Page size for paginated output.
+
     Returns
     ----------
     `pd.DataFrame` with paginated output.
@@ -1299,13 +1316,13 @@ def split_frame(df: pd.DataFrame, current_page: int, max_per_page: int) -> pd.Da
 
 def display_filter_ui(type: str) -> filterArgs:
     """
-    Display UI with filters.  
+    Display UI with filters.
 
     Parameters
     ----------
     type: str, ["transaction_filters","transfer_filters","account_filters"]
         Filter type based on section.
-    
+
     Returns
     ----------
     `filterArgs` dict with filter values.
@@ -1362,8 +1379,10 @@ def display_filter_ui(type: str) -> filterArgs:
             default=None,
         )
 
-        include_transfers = filter_block2[0].checkbox(label="Include Transfers")
-        include_inflow = filter_block2[1].checkbox(label="Include Income")
+        include_transfers = filter_block2[0].checkbox(
+            label="Include Transfers", value=True
+        )
+        include_inflow = filter_block2[1].checkbox(label="Include Income", value=True)
 
         filter_args: filterArgs = {
             "account_types_filter": account_types_filter,
@@ -1446,22 +1465,24 @@ def display_filter_ui(type: str) -> filterArgs:
     return filter_args
 
 
-def display_card_ui(display_df: pd.DataFrame, type: str, default_page_size: int=10) -> None:
+def display_card_ui(
+    display_df: pd.DataFrame, type: str, default_page_size: int = 10
+) -> None:
     """
-    Display UI with cards.  
+    Display UI with cards.
 
     Parameters
     ----------
     display_df: pd.DataFrame
         Input DataFrame to iterate through and create Card UI.
-    
+
     type: str, ["transactions","categories","transfers","accounts"]
         Card UI type based on section.
-    
+
     default_page_size: int, default=10
-        Default page size for number of cards to display per page.   
+        Default page size for number of cards to display per page.
     """
-    
+
     block = st.columns(2)
     left_con = block[0].container()
     right_con = block[1].container()
@@ -1482,7 +1503,6 @@ def display_card_ui(display_df: pd.DataFrame, type: str, default_page_size: int=
     current_page = bottom_menu[2].number_input(
         "Page", min_value=1, max_value=total_pages, step=1, key=f"current_page_{type}"
     )
-    ## Reverse sort based on date.
     for row in split_frame(
         display_df.reset_index(drop=True),
         current_page,
@@ -1495,13 +1515,13 @@ def display_card_ui(display_df: pd.DataFrame, type: str, default_page_size: int=
             con = right_con.container(border=True)
 
         if type == "transactions":
-            line0 = con.columns([7, 5, 1], vertical_alignment="center")
-            line1 = con.columns(2, vertical_alignment="center")
-            line0[0].markdown(row.transaction_merchant_name)
-            line0[1].markdown((row.transaction_date).strftime("%b %d %Y"))
+            line0 = con.columns([1, 7, 5, 1], vertical_alignment="center")
+            line1 = con.columns([4, 5, 1], vertical_alignment="center")
+            line0[1].markdown(row.transaction_merchant_name)
+            line0[2].markdown((row.transaction_date).strftime("%b %d %Y"))
 
             edit_disable = not np.isnan(row.transfer_id)
-            line0[2].button(
+            line0[3].button(
                 "✎",
                 key=f"edit_transaction_{row.transaction_id}",
                 on_click=transaction_dialog,
@@ -1510,15 +1530,26 @@ def display_card_ui(display_df: pd.DataFrame, type: str, default_page_size: int=
                 disabled=edit_disable,
             )
 
-            line1[0].caption(
-                row.transaction_category_name,
+            line0[0].markdown(
+                row.transaction_category_logo,
             )
+            if row.transaction_notes:
+                line1[0].text_area(
+                    label=f"notes_{row.transaction_id}",
+                    value=row.transaction_notes,
+                    label_visibility="collapsed",
+                    height=10,
+                    max_chars=20,
+                    disabled=True,
+                )
             line1[1].metric(
                 label=f"{row.transaction_account_name}",
                 value=format_currency(
                     row.transaction_amount, row.transaction_currency, locale="en_US"
                 ),
             )
+            status_icon = "⏳" if row.transaction_status == "Pending" else "✅"
+            line1[2].text(status_icon)
         elif type == "categories":
             line0 = con.columns([2, 8, 1], vertical_alignment="center")
             if row.category_logo:
@@ -1526,7 +1557,7 @@ def display_card_ui(display_df: pd.DataFrame, type: str, default_page_size: int=
             line0[1].markdown(row.category_name)
             line0[2].button(
                 "✎",
-                key=f"edit_{row.category_name}_{row.category_id}",
+                key=f"edit_category_{row.category_id}",
                 on_click=category_dialog,
                 args=[row._asdict()],
                 use_container_width=True,

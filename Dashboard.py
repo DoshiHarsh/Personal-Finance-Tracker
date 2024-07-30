@@ -112,6 +112,8 @@ with block1[0]:
             filter_args["date_filter"][0] - timedelta(1),
             filter_args["date_filter"][1] + timedelta(1),
         ],
+        xaxis_title="Transaction Date",
+        yaxis_title=f"Transaction Amount ({base_currency})",
     )
     st.plotly_chart(spend_path_fig, use_container_width=True)
 
@@ -122,7 +124,7 @@ with block1[1]:
     current_balances_args: filterArgs = {
         k: filter_args[k] for k in ["date_filter"] if k in filter_args
     }
-    
+
     filtered_transactions_df = filter_df(
         df_name="detailed_transactions_df", **current_balances_args
     )
@@ -132,12 +134,19 @@ with block1[1]:
         "transaction_amount",
         "delta_transaction_amount",
     )
-    balance_viz_df = st.session_state["current_account_balances_df"].merge(
-        delta_total, left_on="account_id", right_on="transaction_account_id", how="left"
-    )
-    balance_viz_df["delta_transaction_amount"] = balance_viz_df[
-        "delta_transaction_amount"
-    ].fillna(0.00)
+    if len(st.session_state["current_account_balances_df"]) > 0:
+        balance_viz_df = st.session_state["current_account_balances_df"].merge(
+            delta_total,
+            left_on="account_id",
+            right_on="transaction_account_id",
+            how="left",
+        )
+        balance_viz_df["delta_transaction_amount"] = balance_viz_df[
+            "delta_transaction_amount"
+        ].fillna(0.00)
+    else:
+        balance_viz_df = st.session_state["current_account_balances_df"]
+        balance_viz_df["delta_transaction_amount"] = None
 
     for index, row in balance_viz_df.sort_values(
         ["account_type_name", "account_name"]
@@ -180,12 +189,22 @@ with block2[0]:
 
     category_spend_df = filter_df(
         df_name="detailed_transactions_df", **category_spend_args
-    )
+    ).sort_values("transaction_category_name")
 
     category_spend_fig = px.bar(
         category_spend_df, "transaction_category_name", "transaction_amount"
     )
+    category_spend_df["transaction_amount"] = category_spend_df[
+        "transaction_amount"
+    ].apply(lambda x: format_currency(x, base_currency))
+    category_spend_fig.update_traces(
+        text=category_spend_df[["transaction_category_name", "transaction_amount"]],
+        hovertemplate="<b>Transaction Category:</b> %{text[0]}"
+        + "<br><b>Transaction Total:</b> %{text[1]}</br>",
+    )
     category_spend_fig.update_layout(
-        hoverlabel=dict(bgcolor="#0E1117", font_size=16, font_family="Sans Serif")
+        hoverlabel=dict(bgcolor="#0E1117", font_size=16, font_family="Sans Serif"),
+        xaxis_title="Transaction Category",
+        yaxis_title=f"Transaction Amount ({base_currency})",
     )
     st.plotly_chart(category_spend_fig, use_container_width=True)
