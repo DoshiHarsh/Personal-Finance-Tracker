@@ -230,6 +230,7 @@ class ConnectDB:
                     update_str += f"{col} = {df[col].iloc[0]}, "
                 else:
                     update_str += f"{col} = '{df[col].iloc[0]}', "
+            update_str = update_str.replace("'None'", "NULL")
             update_str = update_str.replace("None", "NULL")
 
             where_stmt = []
@@ -245,7 +246,7 @@ class ConnectDB:
                 where_str = f"{id_col}={val}"
 
             result = self.raw_query(
-                f"UPDATE {table_name} SET {update_str.rstrip(", ")} WHERE {where_str}"
+                f"UPDATE {table_name} SET {update_str.rstrip(', ')} WHERE {where_str}"
             )
             return result
         except Exception as e:
