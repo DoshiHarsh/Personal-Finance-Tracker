@@ -93,8 +93,8 @@
         "account_type_name" : ["Checking","Savings","Current","Loan","Credit Card","Cash","Brokerage","Gift Card","401k","IRA","HSA","RSU","Stock Option"]
     },
     "categories":{
-        "category_name" : ["Account Transfer","Accommodation","General","Gifts","Healthcare","Household Necessities","Income","Insurance","Leisure & Activities","Maintenance","Pets","Public Transport","Shopping","Travel & Trips","Utilities"],
-        "category_logo" : [null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]
+        "category_name" : ["Account Transfer","Accommodation","Food","General","Gifts","Healthcare","Household Necessities","Income","Insurance","Leisure & Activities","Maintenance","Pets","Public Transport","Shopping","Travel & Trips","Utilities"],
+       "category_logo" : ["🏦","🏠","🍕","👜","🎁","🏥","📝","💵","🌧️","🚴","🛠️","🐾","🚃","🛒","🛫","🚰"]
     },
     "accounts":{
         "account_name" : ["BoFA","USAA","HDFC","Chase Credit","Amex Credit","Cash","Wells Fargo"],
