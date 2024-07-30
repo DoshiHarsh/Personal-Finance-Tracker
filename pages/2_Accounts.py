@@ -13,11 +13,13 @@ from core_components.functions import (
 
 # Due to unknown limitation, setting values to st.session_state with function defined in another script doesn't always execute.
 for table in [
+    "account_types",
+    "categories",
+    "currencies",
     "detailed_accounts",
+    "detailed_transactions",
     "detailed_transfers",
     "detailed_rewards_accounts",
-    "currencies",
-    "account_types",
 ]:
     if f"{table}_df" not in st.session_state:
         st.session_state[f"{table}_df"] = db_operations.table_query(
