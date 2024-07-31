@@ -13,12 +13,6 @@ import plotly.express as px
 from datetime import timedelta
 
 
-st.set_page_config(
-    page_title="Budget tracking",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
-
 if "initial_db_check" not in st.session_state:
     for table in [
         "event_logs",

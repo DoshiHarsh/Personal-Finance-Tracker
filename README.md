@@ -1,5 +1,6 @@
 # Personal Finance Tracker
 
+
 ## Introduction to the Personal Finance Tracker
 
 The Personal Finance Tracker is meant to be a privacy focused tool to help track your financial health to build towards your goals. 
@@ -7,13 +8,14 @@ You can host it either locally or on a cloud hosting service of your preference,
 
 If you'd like to contribute, please feel free to fork the repo, submit pull requests, ideas, or issues.
 
+
 ## Prerequisites to run
 
 To add dummy data while initialization for the first run, please replace the values in [db_config.json](/files/db_config.json) with the values in [dev_db_config.json](/files/dev_db_config.json) before running the streamlit run command.
 
 - local Python (>3.11) installation. Using python version management like pyenv, or virtualenv is recommended. 
 - pip install -r requirements.txt
-- streamlit run Dashboard.py
+- streamlit run personal_finances_tracker.py
  
 
 ## Current features
