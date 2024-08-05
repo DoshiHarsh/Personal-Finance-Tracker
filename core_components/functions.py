@@ -8,7 +8,8 @@ import streamlit as st
 import math
 from babel.numbers import format_currency
 from datetime import datetime, timedelta
-from typing import Unpack, TypedDict, Tuple
+from typing import Unpack, TypedDict, Tuple, Any
+
 
 today = datetime.today()
 db_operations = ConnectDB("budget_db")
@@ -25,7 +26,6 @@ class filterArgs(TypedDict, total=False):
     transaction_status_filter: List
     transfers_filter: bool
     inflow_filter: bool
-    cumulative_calculation: bool
     origin_account_filter: List
     destination_account_filter: List
 
@@ -294,7 +294,6 @@ def filter_df(df_name: str, **kwargs: Unpack[filterArgs]) -> pd.DataFrame:
             "transaction_status_filter": "transaction_status",
             "transfers_filter": "transaction_merchant_name",
             "inflow_filter": "transaction_amount",
-            "cumulative_calculation": "transaction_amount",
         }
 
         if "account_types_filter" in kwargs.keys():
@@ -335,24 +334,6 @@ def filter_df(df_name: str, **kwargs: Unpack[filterArgs]) -> pd.DataFrame:
         if "inflow_filter" in kwargs.keys():
             if not kwargs["inflow_filter"]:
                 df = df[((df[cols["inflow_filter"]] > 0))]
-        # Always last step to ensure the zero value (for time series graph) is at index 0.
-        if "cumulative_calculation" in kwargs.keys():
-            if kwargs["cumulative_calculation"]:
-                cumulative_calc = df.sort_values("transaction_date")[
-                    "transaction_amount"
-                ].cumsum()
-                df = df.join(cumulative_calc, rsuffix="_cumulative").sort_values(
-                    "transaction_date"
-                )
-                zero_val_df = pd.DataFrame(
-                    {
-                        "transaction_date": [df["transaction_date"].min()],
-                        "transaction_amount_cumulative": [0],
-                        "transaction_amount": [0],
-                        "transaction_merchant_name": [""],
-                    }
-                )
-                df = pd.concat([zero_val_df, df])
     elif df_name == "detailed_transfers_df":
         cols = {
             "origin_account_filter": "origin_account_name",
@@ -380,6 +361,46 @@ def filter_df(df_name: str, **kwargs: Unpack[filterArgs]) -> pd.DataFrame:
                     kwargs["date_filter"][0], kwargs["date_filter"][1]
                 )
             ]
+
+    return df.reset_index(drop=True)
+
+
+def cumulative_calculation(
+    df: pd.DataFrame,
+    sort_col: str = "transaction_date",
+    cum_col: str = "transaction_amount",
+) -> pd.DataFrame:
+    """
+    Perform a cumulative sum calculation on DataFrame and add a zero value at index 0.
+
+    Parameters
+    ----------
+    df: pd.DataFrame
+        DataFrame to perform cumulative sum operation on.
+
+    sort_col: str, default="transaction_date"
+        Column name to sort values before performing cumulative sum operation.
+
+    cum_col: str, default="transaction_amount"
+        Column name to return after performing cumulative sum operation.
+
+    Returns
+    -------
+    `pd.DataFrame` with added cumulative sum column and zero value.
+    """
+    cumulative_calc = df.sort_values(sort_col)[cum_col].cumsum()
+
+    df = df.join(cumulative_calc, rsuffix="_cumulative").sort_values(sort_col)
+    # Adding a zero value to start the spend path viz at 0.
+    zero_val_df = pd.DataFrame(
+        {
+            "transaction_date": [df["transaction_date"].min()],
+            "transaction_amount": [0],
+            "transaction_amount_cumulative": [0],
+            "transaction_merchant_name": [""],
+        }
+    )
+    df = pd.concat([zero_val_df, df])
 
     return df.reset_index(drop=True)
 
@@ -454,29 +475,58 @@ def get_current_account_balances(
     -------
     `pd.DataFrame` with new column with current account balance..
     """
-    transactions_sum = df_summary(
+    all_transactions_sum = df_summary(
         transactions_df,
         "transaction_account_id",
         "transaction_amount",
-        "total_transaction_amount",
+        "all_transactions_sum",
     )
-    if len(accounts_df) > 0 and len(transactions_sum) > 0:
+    complete_transactions_sum = df_summary(
+        transactions_df[transactions_df["transaction_status"] == "Complete"],
+        "transaction_account_id",
+        "transaction_amount",
+        "complete_transactions_sum",
+    )
+
+    if len(accounts_df) > 0:
         balances_df = accounts_df.merge(
-            transactions_sum,
+            all_transactions_sum,
             left_on="account_id",
             right_on="transaction_account_id",
             how="left",
         )
-        balances_df["total_transaction_amount"] = balances_df[
-            "total_transaction_amount"
+        balances_df = balances_df.merge(
+            complete_transactions_sum,
+            left_on="account_id",
+            right_on="transaction_account_id",
+            how="left",
+        )
+        balances_df["complete_transactions_sum"] = balances_df[
+            "complete_transactions_sum"
         ].fillna(0.00)
+        balances_df["all_transactions_sum"] = balances_df[
+            "all_transactions_sum"
+        ].fillna(0.00)
+
         balances_df["current_account_balance"] = (
             balances_df["account_starting_balance"]
-            - balances_df["total_transaction_amount"]
+            - balances_df["complete_transactions_sum"]
         )
+        balances_df["pending_account_balance"] = (
+            balances_df["account_starting_balance"]
+            - balances_df["all_transactions_sum"]
+        )
+
     else:
         balances_df = accounts_df
-        balances_df[["current_account_balance", "total_transaction_amount"]] = None
+        balances_df[
+            [
+                "current_account_balance",
+                "pending_account_balance",
+                "complete_transactions_sum",
+                "all_transactions_sum",
+            ]
+        ] = None
     return balances_df
 
 
@@ -541,7 +591,9 @@ def category_dialog(row: Optional[dict] = None) -> None:
     if not isinstance(row, dict):
         row = dict()
     with st.container():
-        category_logo = st.text_input("Logo", value=row.get("category_logo"),max_chars=1)
+        category_logo = st.text_input(
+            "Logo", value=row.get("category_logo"), max_chars=1
+        )
         category_name = st.text_input("Category Name", value=row.get("category_name"))
         submit_enabled = category_name
         ### Does not work
@@ -999,7 +1051,10 @@ def transaction_dialog(row: Optional[dict] = None) -> None:
                     val=row.get("transaction_id"),
                     df=transaction,
                 )
-                del st.session_state["detailed_transactions_df"]
+                del (
+                    st.session_state["detailed_transactions_df"],
+                    st.session_state["current_account_balances_df"],
+                )
                 st.rerun()
             with block4[0].popover("Delete Transaction", use_container_width=True):
                 if st.button(
@@ -1013,7 +1068,10 @@ def transaction_dialog(row: Optional[dict] = None) -> None:
                         id_col="transaction_id",
                         val=row.get("transaction_id"),
                     )
-                    del st.session_state["detailed_transactions_df"]
+                    del (
+                        st.session_state["detailed_transactions_df"],
+                        st.session_state["current_account_balances_df"],
+                    )
                     st.rerun()
         else:
             if block4[2].button(
@@ -1022,7 +1080,10 @@ def transaction_dialog(row: Optional[dict] = None) -> None:
                 db_operations.table_insert(
                     table_name="cashflow_transactions", df=transaction
                 )
-                del st.session_state["detailed_transactions_df"]
+                del (
+                    st.session_state["detailed_transactions_df"],
+                    st.session_state["current_account_balances_df"],
+                )
                 st.rerun()
 
 
@@ -1043,7 +1104,7 @@ def transfer_dialog(row: Optional[dict] = None) -> None:
     if not isinstance(row, dict):
         row = dict()
     with st.container():
-        block1 = st.columns(3)
+        block1 = st.columns(2)
         origin_account_options = st.session_state["detailed_accounts_df"][
             st.session_state["detailed_accounts_df"]["is_active"] == True
         ]["account_name"].sort_values()
@@ -1088,16 +1149,26 @@ def transfer_dialog(row: Optional[dict] = None) -> None:
             ]
             .iloc[0]
         )
-        transfer_date = block1[2].date_input(
+
+        block2 = st.columns(2)
+        transfer_date = block2[0].date_input(
             label="Transfer Date", value=(row.get("transfer_date") or "today")
         )
+        transfer_status_options_emoji = pd.Series(["⏳ Pending", "✅ Complete"])
+        transfer_status_options = pd.Series(["Pending", "Complete"])
+        transfer_status = block2[1].selectbox(
+            "Transfer Status",
+            options=transfer_status_options_emoji,
+            index=(get_index(transfer_status_options, row.get("transfer_status")) or 0),
+        )
+        transfer_status = transfer_status[2:]
 
-        block2 = st.columns([4, 4])
-        origin_transfer_charges = block2[0].number_input(
+        block3 = st.columns([4, 4])
+        origin_transfer_charges = block3[0].number_input(
             label="Origin Transfer Charges",
             value=(row.get("origin_transfer_charges") or 0.00),
         )
-        destination_transfer_charges = block2[1].number_input(
+        destination_transfer_charges = block3[1].number_input(
             label="Destination Transfer Charges",
             value=(row.get("destination_transfer_charges") or 0.00),
         )
@@ -1108,14 +1179,14 @@ def transfer_dialog(row: Optional[dict] = None) -> None:
                 origin_account_details["account_currency"]
                 != destination_account_details["account_currency"]
             ):
-                block3 = st.columns([4, 4, 4])
-                origin_currency = block3[0].selectbox(
+                block4 = st.columns([4, 4, 4])
+                origin_currency = block4[0].selectbox(
                     options=origin_account_details["account_currency"],
                     index=0,
                     label="Origin Currency",
                     disabled=True,
                 )
-                destination_currency = block3[1].selectbox(
+                destination_currency = block4[1].selectbox(
                     options=destination_account_details["account_currency"],
                     index=0,
                     label="Destination Currency",
@@ -1126,7 +1197,7 @@ def transfer_dialog(row: Optional[dict] = None) -> None:
                     destination_currency,
                     st.session_state["currency_rates_df"],
                 )
-                conversion_rate = block3[2].number_input(
+                conversion_rate = block4[2].number_input(
                     label="Conversion Rate",
                     value=(
                         row.get("currency_conversion_rate")
@@ -1140,14 +1211,14 @@ def transfer_dialog(row: Optional[dict] = None) -> None:
                     "account_currency"
                 ]
 
-        block4 = st.columns(2)
-        send_amount = block4[0].number_input(
+        block5 = st.columns(2)
+        send_amount = block5[0].number_input(
             label="Send Amount", value=(row.get("origin_send_amount") or 0.00)
         )
         received_amount_calc = (
             send_amount * conversion_rate
         ) - destination_transfer_charges
-        received_amount = block4[1].number_input(
+        received_amount = block5[1].number_input(
             label="Received Amount", value=received_amount_calc
         )
         transfer_notes = st.text_area(
@@ -1183,6 +1254,7 @@ def transfer_dialog(row: Optional[dict] = None) -> None:
                     "destination_received_amount": [received_amount],
                     "destination_currency": [destination_currency],
                     "destination_transfer_charges": [destination_transfer_charges],
+                    "transfer_status": [transfer_status],
                     "is_destination_rewards_account": [False],
                     "transfer_notes": [transfer_notes],
                 }
@@ -1213,13 +1285,13 @@ def transfer_dialog(row: Optional[dict] = None) -> None:
                         -(received_amount - destination_transfer_charges),
                     ],
                     "transaction_notes": [transfer_notes] * 2,
-                    "transaction_status": ["Complete"] * 2,
+                    "transaction_status": [transfer_status] * 2,
                     "transfer_id": [row.get("transfer_id")] * 2,
                 }
             )
-        block5 = st.columns(3)
+        block6 = st.columns(3)
         if row.get("transfer_id"):
-            if block5[2].button(
+            if block6[2].button(
                 "Update Transfer",
                 disabled=not submit_enabled,
                 use_container_width=True,
@@ -1247,7 +1319,7 @@ def transfer_dialog(row: Optional[dict] = None) -> None:
                     st.session_state["detailed_transfers_df"],
                 )
                 st.rerun()
-            with block5[0].popover("Delete Transfer", use_container_width=True):
+            with block6[0].popover("Delete Transfer", use_container_width=True):
                 if st.button(
                     "Delete Transfer",
                     disabled=not submit_enabled,
@@ -1270,7 +1342,7 @@ def transfer_dialog(row: Optional[dict] = None) -> None:
                     )
                     st.rerun()
         else:
-            if block5[2].button(
+            if block6[2].button(
                 "Add Transfer", disabled=not submit_enabled, use_container_width=True
             ):
                 db_operations.table_insert(table_name="cashflow_transfers", df=transfer)
@@ -1314,7 +1386,7 @@ def split_frame(df: pd.DataFrame, current_page: int, max_per_page: int) -> pd.Da
     ]
 
 
-def display_filter_ui(type: str) -> filterArgs:
+def display_filter_ui(type: str, **kwargs: Any) -> filterArgs:
     """
     Display UI with filters.
 
@@ -1322,6 +1394,9 @@ def display_filter_ui(type: str) -> filterArgs:
     ----------
     type: str, ["transaction_filters","transfer_filters","account_filters"]
         Filter type based on section.
+
+    **kwargs: Any
+        Additional args as input for certain filters.
 
     Returns
     ----------
@@ -1392,7 +1467,6 @@ def display_filter_ui(type: str) -> filterArgs:
             "transaction_status_filter": transaction_status_filter,
             "transfers_filter": include_transfers,
             "inflow_filter": include_inflow,
-            "cumulative_calculation": False,
         }
     elif type == "transfer_filters":
         filter_block1 = filters.columns(3)
@@ -1462,6 +1536,67 @@ def display_filter_ui(type: str) -> filterArgs:
             "account_rewards_filter": account_rewards_filter,
             "is_active_filter": not is_active_filter,
         }
+    elif type == "account_reconciliation_filters":
+        filter_block1 = filters.columns(3)
+        categories_types_filter = filter_block1[0].multiselect(
+            label="Categories",
+            options=st.session_state["categories_df"]["category_name"]
+            .sort_values()
+            .unique(),
+        )
+        date_filter = filter_block1[1].selectbox(
+            label="Date Range",
+            options=[
+                "Since last reconciliation",
+                "Current Month",
+                "Last 30 Days",
+                "Last 365 Days",
+                "YTD",
+                "Custom",
+            ],
+        )
+        if date_filter == "Custom":
+            start_date_filter = pd.to_datetime(
+                filter_block1[1].date_input(label="Start Date", value="today")
+            )
+            end_date_filter = pd.to_datetime(
+                filter_block1[2].date_input(
+                    label="End Date", value="today", min_value=start_date_filter
+                )
+            )
+        elif date_filter == "Current Month":
+            start_date_filter, end_date_filter = datetime(
+                today.year, today.month, 1
+            ), datetime(today.year, today.month, 1) + pd.offsets.MonthEnd(1)
+        elif date_filter == "Last 30 Days":
+            start_date_filter, end_date_filter = today - timedelta(30), today
+        elif date_filter == "Last 365 Days":
+            start_date_filter, end_date_filter = today - timedelta(365), today
+        elif date_filter == "YTD":
+            start_date_filter, end_date_filter = datetime(today.year, 1, 1), today
+        elif date_filter == "Since last reconciliation":
+            if "last_reconciliation" in kwargs:
+                if not pd.isnull(kwargs["last_reconciliation"]):
+                    start_date_filter, end_date_filter = (
+                        kwargs["last_reconciliation"],
+                        today,
+                    )
+                else:
+                    start_date_filter, end_date_filter = datetime(1970, 1, 1), today
+            else:
+                start_date_filter, end_date_filter = datetime(1970, 1, 1), today
+
+        transaction_status_filter = filter_block1[2].multiselect(
+            label="Transaction Status",
+            options=["Complete", "Pending"],
+            default=None,
+        )
+
+        filter_args: filterArgs = {
+            "date_filter": (start_date_filter, end_date_filter),
+            "categories_types_filter": categories_types_filter,
+            "transaction_status_filter": transaction_status_filter,
+        }
     return filter_args
 
 
@@ -1516,7 +1651,7 @@ def display_card_ui(
 
         if type == "transactions":
             line0 = con.columns([1, 7, 5, 1], vertical_alignment="center")
-            line1 = con.columns([4, 5, 1], vertical_alignment="center")
+            line1 = con.columns([5, 4, 1], vertical_alignment="center")
             line0[1].markdown(row.transaction_merchant_name)
             line0[2].markdown((row.transaction_date).strftime("%b %d %Y"))
 
@@ -1534,7 +1669,7 @@ def display_card_ui(
                 row.transaction_category_logo,
             )
             if row.transaction_notes:
-                line1[0].text_area(
+                line1[1].text_area(
                     label=f"notes_{row.transaction_id}",
                     value=row.transaction_notes,
                     label_visibility="collapsed",
@@ -1542,7 +1677,7 @@ def display_card_ui(
                     max_chars=20,
                     disabled=True,
                 )
-            line1[1].metric(
+            line1[0].metric(
                 label=f"{row.transaction_account_name}",
                 value=format_currency(
                     row.transaction_amount, row.transaction_currency, locale="en_US"
@@ -1564,7 +1699,7 @@ def display_card_ui(
             )
         elif type == "transfers":
             line0 = con.columns([8, 4, 1], vertical_alignment="center")
-            line1 = con.columns(2, vertical_alignment="center")
+            line1 = con.columns([5, 5, 1], vertical_alignment="center")
             line0[0].markdown(
                 f"{row.origin_account_name} -> {row.destination_account_name}"
             )
@@ -1596,8 +1731,11 @@ def display_card_ui(
                     locale="en_US",
                 ),
             )
+            status_icon = "⏳" if row.transfer_status == "Pending" else "✅"
+            line1[2].text(status_icon)
         elif type == "accounts":
-            line0 = con.columns([7, 4, 1], vertical_alignment="bottom")
+            line0 = con.columns([7, 4, 1], vertical_alignment="center")
+            line1 = con.columns([6, 4], vertical_alignment="center")
             line0[0].subheader(row.account_name, anchor=False)
             line0[2].button(
                 "✎",
@@ -1610,12 +1748,25 @@ def display_card_ui(
             line0[1].markdown(
                 f":gray-background[:blue[{row.account_type_name}]]",
             )
-            con.metric(
+            line1[0].metric(
                 "Current Balance",
                 format_currency(
                     row.current_account_balance, row.account_currency, locale="en_US"
                 ),
             )
+            last_reconciled = (
+                (row.account_last_reconciled).strftime("%b %d %Y")
+                if not pd.isnull(row.account_last_reconciled)
+                else "Not Reconciled"
+            )
+            line1[1].caption(f"Last Reconciled: {last_reconciled}")
+            if line1[1].button(
+                label="Reconcile Now",
+                key=f"reconcile_now_{row.account_id}",
+                use_container_width=True,
+            ):
+                st.session_state["reconciliation_account"] = row._asdict()
+                st.switch_page("pages/account_reconciliation.py")
 
 
 curr = Currencies(db_operations)

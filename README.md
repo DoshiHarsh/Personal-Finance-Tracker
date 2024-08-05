@@ -1,5 +1,6 @@
 # Personal Finance Tracker
 
+
 ## Introduction to the Personal Finance Tracker
 
 The Personal Finance Tracker is meant to be a privacy focused tool to help track your financial health to build towards your goals. 
@@ -7,13 +8,14 @@ You can host it either locally or on a cloud hosting service of your preference,
 
 If you'd like to contribute, please feel free to fork the repo, submit pull requests, ideas, or issues.
 
+
 ## Prerequisites to run
 
 To add dummy data while initialization for the first run, please replace the values in [db_config.json](/files/db_config.json) with the values in [dev_db_config.json](/files/dev_db_config.json) before running the streamlit run command.
 
 - local Python (>3.11) installation. Using python version management like pyenv, or virtualenv is recommended. 
 - pip install -r requirements.txt
-- streamlit run Dashboard.py
+- streamlit run personal_finances_tracker.py
  
 
 ## Current features
@@ -23,6 +25,7 @@ To add dummy data while initialization for the first run, please replace the val
 - Add transactions for your expenses and income.
 - Transfer money between accounts with currency rate conversions and origin/destination transfer fees.
 - Visualize spending, current account balances and spend by category over time.
+- Reconcile account balances.
 
 
 ## Walkthrough (To-do)
@@ -36,10 +39,6 @@ To add dummy data while initialization for the first run, please replace the val
 
 For a up to date overview of completed, planned work and priorities visit the [Project Board](https://github.com/users/DoshiHarsh/projects/2/views/2).
 
-- Account reconciliation
-    - See last reconciled amounts and dates.
-    - View and edit transactions since last reconciliation
-    - Override and update original starting balance by adding current accurate value.
 
 - Spending and Saving goals
     - Automatic allocations towards goals from income (Monthly/ Yearly/ Per paycheck)
@@ -103,6 +102,7 @@ For a up to date overview of completed, planned work and priorities visit the [P
 -  Account enhancements
     - RSU/Stock options income related fields for UI
     - Joint accounts with other users on instance
+    - Override and update original starting balance by adding current accurate value.
 
 - Rewards enhancements
     - Ability to add rewards as statement credit during transactions
@@ -160,3 +160,4 @@ Currency rates implemented using Free API from [Exchange Rate API](https://www.e
 
 - Miscellaneous:
     - https://towardsdatascience.com/part-1-a-guide-for-optimizing-your-data-science-workflow-53add6481556
+    - https://www.youtube.com/watch?app=desktop&v=Pin0-ceDKcI&feature=youtu.be

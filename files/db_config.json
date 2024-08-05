@@ -6,7 +6,7 @@
         "account_starting_balance" : "FLOAT DEFAULT 0.0",
         "account_currency" : "TEXT NOT NULL",
         "account_rewards" : "BOOL DEFAULT FALSE",
-        "account_last_reconciled" : "INTEGER",
+        "account_last_reconciled" : "REAL",
         "is_active" : "BOOL DEFAULT TRUE"
     },
     "account_types":{
@@ -48,6 +48,7 @@
         "destination_received_amount" : "FLOAT DEFAULT 0.0",
         "destination_currency" : "TEXT",
         "destination_transfer_charges" : "FLOAT DEFAULT 0.0",
+        "transfer_status" : "TEXT DEFAULT 'Pending'",
         "is_destination_rewards_account" : "BOOL DEFAULT FALSE",
         "transfer_notes" : "TEXT"        
     },
