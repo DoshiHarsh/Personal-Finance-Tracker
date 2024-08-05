@@ -7,6 +7,7 @@ from core_components.functions import (
     filter_df,
     filterArgs,
     get_current_account_balances,
+    cumulative_calculation,
 )
 from babel.numbers import format_currency
 import plotly.express as px
@@ -70,9 +71,9 @@ block2 = dashboard_viz.columns(2)
 with block1[0]:
     st.subheader("Spend Path", anchor=False)
     spend_path_args = filter_args
-    spend_path_args["cumulative_calculation"] = True
 
     spend_path_df = filter_df(df_name="detailed_transactions_df", **spend_path_args)
+    spend_path_df = cumulative_calculation(spend_path_df)
     spend_path_df["transaction_amount"] = spend_path_df["transaction_amount"].apply(
         lambda x: format_currency(x, base_currency)
     )
@@ -126,7 +127,7 @@ with block1[1]:
         filtered_transactions_df,
         "transaction_account_id",
         "transaction_amount",
-        "delta_transaction_amount",
+        "delta_transaction_sum",
     )
     if len(st.session_state["current_account_balances_df"]) > 0:
         balance_viz_df = st.session_state["current_account_balances_df"].merge(
@@ -135,12 +136,12 @@ with block1[1]:
             right_on="transaction_account_id",
             how="left",
         )
-        balance_viz_df["delta_transaction_amount"] = balance_viz_df[
-            "delta_transaction_amount"
+        balance_viz_df["delta_transaction_sum"] = balance_viz_df[
+            "delta_transaction_sum"
         ].fillna(0.00)
     else:
         balance_viz_df = st.session_state["current_account_balances_df"]
-        balance_viz_df["delta_transaction_amount"] = None
+        balance_viz_df["delta_transaction_sum"] = None
 
     for index, row in balance_viz_df.sort_values(
         ["account_type_name", "account_name"]
@@ -151,11 +152,11 @@ with block1[1]:
             locale="en_US",
         )
         balance_delta = format_currency(
-            -row["delta_transaction_amount"],
+            -row["delta_transaction_sum"],
             row["account_currency"],
             locale="en_US",
         )
-        color_toggle = "off" if -row["delta_transaction_amount"] == 0 else "normal"
+        color_toggle = "off" if -row["delta_transaction_sum"] == 0 else "normal"
         con.metric(
             label=f"{row['account_name']} :gray-background[:blue[{row['account_type_name']}]]",
             value=current_balance,
@@ -175,7 +176,6 @@ with block2[0]:
             "transfers_filter",
             "inflow_filter",
             "date_filter",
-            "cumulative_calculation",
         ]
         if k in filter_args
     }

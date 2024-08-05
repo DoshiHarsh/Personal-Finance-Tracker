@@ -10,7 +10,7 @@ for table in ["categories", "detailed_transactions"]:
 
 block1 = st.columns([6, 2], vertical_alignment="bottom")
 block1[0].title("Categories")
-block1[1].button("Add new Category", on_click=category_dialog, use_container_width=True)
+block1[1].button("New Category", on_click=category_dialog, use_container_width=True)
 display_card_ui(
     st.session_state["categories_df"].sort_values("category_name"),
     type="categories",

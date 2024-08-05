@@ -6,7 +6,7 @@
         "account_starting_balance" : "FLOAT DEFAULT 0.0",
         "account_currency" : "TEXT NOT NULL",
         "account_rewards" : "BOOL DEFAULT FALSE",
-        "account_last_reconciled" : "INTEGER",
+        "account_last_reconciled" : "REAL",
         "is_active" : "BOOL DEFAULT TRUE"
     },
     "account_types":{
@@ -48,6 +48,7 @@
         "destination_received_amount" : "FLOAT DEFAULT 0.0",
         "destination_currency" : "TEXT",
         "destination_transfer_charges" : "FLOAT DEFAULT 0.0",
+        "transfer_status" : "TEXT DEFAULT 'Pending'",
         "is_destination_rewards_account" : "BOOL DEFAULT FALSE",
         "transfer_notes" : "TEXT"        
     },
@@ -111,7 +112,7 @@
         "starting_rewards_balance" : [36582,6.53]
     },
     "cashflow_transactions":{
-        "transaction_date" : ["2024-07-01", "2024-07-04", "2024-07-04", "2024-07-04", "2024-07-05", "2024-07-07", "2024-07-08", "2024-07-09", "2024-07-10", "2024-07-13"],
+        "transaction_date" : ["2024-08-01", "2024-08-04", "2024-08-04", "2024-08-04", "2024-08-05", "2024-08-07", "2024-08-08", "2024-08-09", "2024-08-10", "2024-08-13"],
         "transaction_merchant_name" : ["Landlord", "Dominion", "BoFA -> Wells Fargo Transfer", "BoFA -> Wells Fargo Transfer", "Comcast", "Employer", "Amazon", "Walmart", "Target", "Petsmart"],
         "transaction_account_id" : [2, 5, 1, 7, 5, 2, 4, 4, 5, 4],
         "transaction_currency" : ["USD", "USD", "USD", "USD", "USD", "USD", "USD", "USD", "USD", "USD"],
@@ -122,13 +123,13 @@
         "transaction_total" : [1856.45, 94.58, 943.89, -867.44, 72.75, -5499.72, 88.59, 490.08, 120.32, 65.11],
         "transaction_status" : ["Complete", "Complete", "Complete", "Complete", "Pending", "Complete", "Pending", "Pending", "Pending", "Pending"],
         "transaction_notes" : ["", "", "", "", "", "", "", "", "", ""],
-        "transaction_category_id" :  [2, 15, 1, 1, 15, 7, 6, 4, 13, 11],
+        "transaction_category_id" :  [2, 16, 1, 1, 16, 8, 7, 5, 14, 12],
         "transfer_id": [null,null,1,1,null,null,null,null,null,null],
         "transaction_sub_category" : ["Rent", "Electric Bill", null, null, "Internet Bill", "Paycheck", "Misc", "Family Gifts", "Groceries", "Pet Care"],
         "allocation_goal_id" : [null,null,null,null,null,null,null,null,null,null]
     },    
     "cashflow_transfers":{
-        "transfer_date" : ["2024-07-04"],
+        "transfer_date" : ["2024-08-04"],
         "origin_account_id" : [1],
         "destination_account_id" : [7],
         "origin_send_amount" : [867.44],
@@ -139,6 +140,7 @@
         "destination_currency" : ["USD"],
         "destination_transfer_charges" : [0],
         "is_destination_rewards_account" : [false],
+        "transfer_status" : ["Complete"],
         "transfer_notes" : [null]        
     }
 },

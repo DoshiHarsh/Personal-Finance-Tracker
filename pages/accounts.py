@@ -32,6 +32,11 @@ st.session_state["current_account_balances_df"] = get_current_account_balances(
 st.session_state["detailed_transfers_df"]["transfer_date"] = pd.to_datetime(
     st.session_state["detailed_transfers_df"]["transfer_date"]
 )
+st.session_state["current_account_balances_df"]["account_last_reconciled"] = (
+    pd.to_datetime(
+        st.session_state["current_account_balances_df"]["account_last_reconciled"]
+    )
+)
 
 block1 = st.columns([5, 2, 2], vertical_alignment="bottom")
 block1[0].title("Accounts")

@@ -133,12 +133,16 @@ class ConnectDB:
         -------
         `True` if table exists, `False` otherwise.
         """
-        result = self.table_query(
-            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}'"
-        )
-        if len(result) > 0:
-            return True
-        else:
+        try:
+            result = self.table_query(
+                f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}'"
+            )
+            if len(result) > 0:
+                return True
+            else:
+                return False
+        except Exception as e:
+            print(e)
             return False
 
     def table_insert(
